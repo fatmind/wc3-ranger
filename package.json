@@ -1,0 +1,19 @@
+{
+  "name": "webclaw3",
+  "version": "0.6.0",
+  "description": "webclaw3 L0 — Chrome 浏览器中继 + CDP 代理 + AI 浏览技能",
+  "type": "module",
+  "main": "scripts/relay.mjs",
+  "bin": {
+    "wc3-ranger": "scripts/wc3-ranger.mjs"
+  },
+  "scripts": {
+    "start": "node scripts/start-relay.mjs",
+    "cdp-start": "node scripts/start-cdp-proxy.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": ["chrome", "extension", "relay", "cdp", "browser-automation"],
+  "license": "MIT"
+}

@@ -1,41 +1,66 @@
 #!/usr/bin/env node
 // CDP Proxy - 通过 HTTP API 操控用户日常 Chrome
-// web-ranger 增强版：新增 Aria 树接口 + 请求日志
+// wc3-ranger 增强版：新增 Aria 树接口 + 请求日志
 // Node.js 22+（使用原生 WebSocket）
 
 import http from 'node:http';
 import { URL } from 'node:url';
 import fs from 'node:fs';
+import { appendFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import net from 'node:net';
 
 const PORT = parseInt(process.env.CDP_PROXY_PORT || '3456');
-const LOG_FILE = process.env.CDP_LOG_FILE || path.join(process.cwd(), 'operation_log.json');
 let ws = null;
 let cmdId = 0;
 const pending = new Map(); // id -> {resolve, timer}
 const sessions = new Map(); // targetId -> sessionId
 const ariaRefs = new Map(); // targetId -> Map(refId -> { backendDOMNodeId, role, name })
 
-// --- 请求日志 ---
+// --- 请求日志（NDJSON append，与 relay.mjs 格式一致）---
 const NO_LOG_PATHS = new Set(['/health', '/targets', '/logs']);
+const PATH_TO_OP = {
+  '/eval': 'cdp.eval',
+  '/click': 'cdp.click',
+  '/clickAt': 'cdp.clickAt',
+  '/scroll': 'cdp.scroll',
+  '/screenshot': 'cdp.screenshot',
+  '/aria-tree': 'cdp.ariaTree',
+  '/click-aria': 'cdp.clickAria',
+  '/type-aria': 'cdp.typeAria',
+  '/new': 'cdp.new',
+  '/close': 'cdp.close',
+  '/navigate': 'cdp.navigate',
+  '/back': 'cdp.back',
+  '/info': 'cdp.info',
+  '/setFiles': 'cdp.setFiles',
+};
 
-function logOperation(method, pathname, params, responseSummary) {
+const LOG_RESULT_MAX = 500;
+function truncateForLog(value) {
+  const s = typeof value === 'string' ? value : JSON.stringify(value);
+  if (!s || s.length <= LOG_RESULT_MAX) return s;
+  return s.slice(0, LOG_RESULT_MAX) + `...(truncated, original ${s.length} chars)`;
+}
+
+async function logOperation(logFile, method, pathname, params, resultOrError, durationMs) {
+  if (!logFile) return;
+  const op = PATH_TO_OP[pathname] || `cdp.${pathname.slice(1)}`;
   const entry = {
-    timestamp: new Date().toISOString(),
-    method,
-    path: pathname,
+    op,
     params,
-    response: responseSummary,
+    timestamp: new Date().toISOString(),
+    channel: 'cdp_http',
+    duration_ms: durationMs,
   };
+  if (resultOrError instanceof Error) {
+    entry.error = resultOrError.message;
+  } else {
+    entry.result = truncateForLog(resultOrError);
+  }
   try {
-    let logs = [];
-    if (fs.existsSync(LOG_FILE)) {
-      logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf-8'));
-    }
-    logs.push(entry);
-    fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2));
+    await appendFile(logFile, JSON.stringify(entry) + '\n', 'utf-8');
   } catch { /* 日志写入失败不影响主流程 */ }
 }
 
@@ -400,6 +425,9 @@ const server = http.createServer(async (req, res) => {
   const parsed = new URL(req.url, `http://localhost:${PORT}`);
   const pathname = parsed.pathname;
   const q = Object.fromEntries(parsed.searchParams);
+  const logFile = q.logFile || null;
+  if (q.logFile) delete q.logFile;
+  const startTime = Date.now();
 
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
@@ -643,7 +671,6 @@ const server = http.createServer(async (req, res) => {
       const tree = await getAriaTree(sid, q.target);
       const refCount = ariaRefs.get(q.target)?.size || 0;
       const result = { tree, refs: refCount };
-      if (!NO_LOG_PATHS.has(pathname)) logOperation('GET', pathname, { target: q.target }, { refs: refCount, lines: tree.split('\n').length });
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       res.end(tree);
       return;
@@ -668,7 +695,6 @@ const server = http.createServer(async (req, res) => {
       if (!node) {
         res.statusCode = 400;
         const result = { error: `未找到 Aria 节点: role=${body.role}, name=${body.name || '(any)'}` };
-        if (!NO_LOG_PATHS.has(pathname)) logOperation('POST', pathname, body, result);
         res.end(JSON.stringify(result));
         return;
       }
@@ -687,7 +713,6 @@ const server = http.createServer(async (req, res) => {
 
       const val = clickResp.result?.result?.value || {};
       const result = { clicked: true, ref: node.refId, role: node.role, name: node.name, ...val };
-      if (!NO_LOG_PATHS.has(pathname)) logOperation('POST', pathname, body, { clicked: true, ref: node.refId });
       res.end(JSON.stringify(result));
     }
 
@@ -709,7 +734,6 @@ const server = http.createServer(async (req, res) => {
       if (!node) {
         res.statusCode = 400;
         const result = { error: `未找到 Aria 节点: role=${body.role}, name=${body.name || '(any)'}` };
-        if (!NO_LOG_PATHS.has(pathname)) logOperation('POST', pathname, { role: body.role, name: body.name }, result);
         res.end(JSON.stringify(result));
         return;
       }
@@ -743,16 +767,17 @@ const server = http.createServer(async (req, res) => {
       }, sid);
 
       const result = { typed: true, ref: node.refId, role: node.role, name: node.name, text: body.text };
-      if (!NO_LOG_PATHS.has(pathname)) logOperation('POST', pathname, { role: body.role, name: body.name, text: body.text }, { typed: true, ref: node.refId });
       res.end(JSON.stringify(result));
     }
 
-    // GET /logs - 读取操作日志
+    // GET /logs?logFile=xxx - 读取操作日志（NDJSON 格式）
     else if (pathname === '/logs' && req.method === 'GET') {
+      const lf = q.logFile;
       try {
-        if (fs.existsSync(LOG_FILE)) {
-          const logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf-8'));
-          res.end(JSON.stringify(logs, null, 2));
+        if (lf && fs.existsSync(lf)) {
+          const content = fs.readFileSync(lf, 'utf-8');
+          const lines = content.trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
+          res.end(JSON.stringify(lines, null, 2));
         } else {
           res.end('[]');
         }
@@ -762,10 +787,11 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // DELETE /logs - 清空操作日志
+    // DELETE /logs?logFile=xxx - 清空操作日志
     else if (pathname === '/logs' && req.method === 'DELETE') {
+      const lf = q.logFile;
       try {
-        fs.writeFileSync(LOG_FILE, '[]');
+        if (lf) fs.writeFileSync(lf, '');
       } catch { /* ignore */ }
       res.end(JSON.stringify({ cleared: true }));
       return;
@@ -797,16 +823,17 @@ const server = http.createServer(async (req, res) => {
       }));
     }
 
-    // --- 记录操作日志（排除查询类接口和已单独记录的接口）---
-    if (!NO_LOG_PATHS.has(pathname) && !['/aria-tree', '/click-aria', '/type-aria', '/logs'].includes(pathname)) {
+    // --- 记录操作日志（排除查询类接口）---
+    if (!NO_LOG_PATHS.has(pathname) && pathname !== '/logs') {
       const params = { ...q };
       if (req.method === 'POST') params._body = '(see request)';
-      logOperation(req.method, pathname, params, { status: res.statusCode || 200 });
+      await logOperation(logFile, req.method, pathname, params, 'ok', Date.now() - startTime);
     }
 
   } catch (e) {
     res.statusCode = 500;
     res.end(JSON.stringify({ error: e.message }));
+    await logOperation(logFile, req.method, pathname, q, e, Date.now() - startTime);
   }
 });
 
