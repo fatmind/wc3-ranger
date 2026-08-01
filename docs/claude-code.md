@@ -12,16 +12,16 @@ Everything happens in the Claude Code chat — you say things, it runs the comma
 **1. Install + check** — say:
 
 ```
-帮我安装 webclaw3（https://github.com/fatmind/wc3-ranger），装好检查一下环境
+Install webclaw3 (https://github.com/fatmind/wc3-ranger) for me, then check the environment
 ```
 
 Claude Code clones the repo into `~/.claude/skills/webclaw3`, starts the local services, and walks you through the basic configuration (paste the Access Key, confirm the default directory for generated skills, etc.).
 
 **2. Use it** — from here everything is conversation:
 
-- Explore: `帮我看看 https://example.com 的热榜都有什么` → adjust until it's exactly what you want
-- Distill: `把刚才这个提炼成 skill，我以后要每天跑` (first time, it helps you grab an Access Key from [webclaw3.com](https://webclaw3.com))
-- Run daily: `/skill名 跑一下` or schedule it
+- Explore: `show me the trending list at https://example.com` → adjust until it's exactly what you want
+- Distill: `distill that into a skill — I want to run it every day` (first time, it helps you grab an Access Key from [webclaw3.com](https://webclaw3.com))
+- Run daily: `/skill-name run it` or schedule it
 - Repair: paste the error, it fixes the skill locally
 
 The full flow with examples is in the [README](../README.md#quickstart).

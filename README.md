@@ -30,7 +30,7 @@ The fix: **explore once, distill it into a skill, rerun it for free.** Everythin
 
 **① Explore — figure out what you actually want.** Just point in a rough direction; the agent drives your real browser with this skill. Requirements are discovered by trying: watch the real output and adjust scope, filters, fields — until you can say *"this is exactly it."*
 
-**② Distill — one sentence turns it into a skill.** Say *"帮我提炼 / distill this into a skill."* The agent confirms the final requirements with you, then **webclaw3** re-explores the site with your local Chrome login state, generates the skill, and validates it with varied parameters — tens of minutes in the background, all on your own machine.
+**② Distill — one sentence turns it into a skill.** Say *"distill this into a skill."* The agent confirms the final requirements with you, then **webclaw3** re-explores the site with your local Chrome login state, generates the skill, and validates it with varied parameters — tens of minutes in the background, all on your own machine.
 
 **③ Run daily — deterministic and ~free.** The generated skill is a plain script: **zero or near-zero tokens**, millisecond response, identical results every run. Schedule it, rerun it any time.
 
@@ -56,7 +56,7 @@ You never leave your agent's chat — Claude Code, workbuddy, or qoderwork all w
 Then say to your agent:
 
 ```
-帮我安装 webclaw3（https://github.com/fatmind/wc3-ranger），装好检查一下环境
+Install webclaw3 (https://github.com/fatmind/wc3-ranger) for me, then check the environment
 ```
 
 The agent clones this repo into your skills directory, starts the local services, and walks you through the basic configuration (paste the Access Key you just got, etc.). One thing worth knowing: webclaw3 drives *your* browser with *your* login state — passwords never go through anyone.
@@ -64,15 +64,15 @@ The agent clones this repo into your skills directory, starts the local services
 **2. Explore.** Describe a task roughly and let the agent run it for real:
 
 ```
-帮我看看 SkillHub（https://skillhub.cn/）的下载热榜都有什么
+Show me what's on the download trending list at SkillHub (https://skillhub.cn/)
 ```
 
-Adjust as you watch (`每条加上下载量和评分` / `只要前 10 条`) until it's exactly what you want. Only once you're happy is it worth distilling — so you never pay for that run, in money or time, again.
+Adjust as you watch (`add downloads and rating to each item` / `top 10 is enough`) until it's exactly what you want. Only once you're happy is it worth distilling — so you never pay for that run, in money or time, again.
 
 **3. Distill.** Say:
 
 ```
-把刚才这个提炼成 skill，我以后要每天跑
+Distill that into a skill — I want to run it every day
 ```
 
 webclaw3 tidies up your requirements, and on your OK generates locally. Generation takes tens of minutes in the background — the agent polls progress, validates, and installs the skill automatically.
@@ -80,15 +80,15 @@ webclaw3 tidies up your requirements, and on your OK generates locally. Generati
 **4. Run it daily:**
 
 ```
-/skillhub-trending（举例） 跑一下今天的榜单
+/skillhub-trending run today's list
 ```
 
-or schedule it (`每天早上 8 点自动跑 skillhub-trending`). Runs locally, fast, stable, zero or near-zero tokens.
+or schedule it (`run skillhub-trending every morning at 8`). Runs locally, fast, stable, zero or near-zero tokens.
 
 **5. Something broke:** also just one sentence:
 
 ```
-skillhub-trending 跑失败了，webclaw3 帮我修一下
+skillhub-trending failed — webclaw3, fix it for me
 ```
 
 webclaw3 repairs it locally.
