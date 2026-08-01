@@ -1,55 +1,104 @@
 # webclaw3
 
-> 给 Claude Code 的浏览器操作 Skill —— 定义浏览哲学 + 双通道触达浏览器（Extension Relay 优先，CDP 兜底）。
+**English** | [中文](./README.zh-CN.md)
 
-## 这是什么
+> Teach your AI agent browser tasks once — run free forever.
 
-webclaw3 是一个独立的 Claude Code skill，教 AI **怎么浏览网页**：目标导向、过程校验、条件不可达时灵活调整。
+Every time you ask an AI agent to do something in a browser, you pay in tokens — and the result is flaky: it works today, fails tomorrow with nothing changed. webclaw3 turns one successful exploration into a reusable **skill**, so a task you run every day stops costing you every day.
 
-它由两部分组成：`SKILL.md`（浏览哲学与操作指引）+ `scripts/`（触达浏览器的**连接层**）。要真正操作浏览器，就必然依赖 `scripts/`：
+![intro](assets/intro.gif)
 
-- `scripts/relay.mjs` —— 桥接到 [wc3-chrome](https://github.com/fatmind/wc3-chrome) 扩展（HTTP :3459 ↔ WebSocket ↔ 插件）。**默认主通道**
-- `scripts/cdp-proxy.mjs` —— 直连 Chrome CDP（HTTP :3456 ↔ :9222）。**兜底通道**：Extension 通道整体不可用时回退到它，能力等价
-- `scripts/wc3-ranger.mjs` —— 启停 / 健康检查上述两者
+## The cost problem
 
-真正在浏览器里执行操作的**插件本身是 wc3-chrome（L0）**；webclaw3 依赖它，但自带连接脚本，作为 skill 独立可运行。
+A single "go look at this site" task costs millions of tokens. Here's a real API bill for one browser task:
 
-## 能力
+![cost](assets/cost.png)
 
-| 能力 | 说明 |
-|------|------|
-| **双通道触达** | Extension Relay 优先，CDP 兜底；同一真实 Chrome，能力等价 |
-| 联网工具自主选型 | WebSearch / WebFetch / curl / 浏览器中继，按场景判断 |
-| **Aria 树语义理解** | 压缩语义树（~500 行 vs DOM ~10000 行），低 token 看全貌 |
-| **Aria 语义交互** | `page.click` / `page.fillForm` 按 ref_N 定位，抗改版 |
-| **page.eval 任意 JS** | 穿透 Shadow DOM / iframe / SPA 数据层 |
-| 并行分治 | 多目标分发子 Agent 并行执行 |
-| 媒体提取 | 从 DOM 取图片/视频 URL，或对视频截帧分析 |
+- Prompt 2.3M × $3/MTok = $6.90 | Completion 20.5K × $15/MTok = $0.31 | Cache 2.1M × $0.30/MTok = $0.63
+- With cache-hit variance: **~$2–$3+ per task** on Sonnet
+- On Opus ($5/$25) the same task runs **$5–$8+**; complex multi-step exploration easily exceeds $10
 
-## 前置依赖
+Run it daily and that's **$90+ a month** — for the exact same steps, re-thought from scratch every time. And beyond the money:
 
-1. **Node.js 22+**
-2. **wc3-chrome 扩展**：从 [wc3-chrome](https://github.com/fatmind/wc3-chrome) 获取，Chrome 开发者模式加载其 `extension/` 目录（一次性，引导见 [references/setup.md](./references/setup.md)）
-3. **Relay 运行中**：跑一次 doctor 即可，未启动会自动拉起
+- **It burns cash daily.** Same site, same steps, millions of tokens every single time — like hiring someone who forgets everything overnight.
+- **It's unreliable.** AI browsing is inherently flaky; a task succeeds now and fails next time just because elements loaded in a different order.
+- **It needs babysitting.** You pay AND watch it run, ready to re-run at any moment.
 
-```bash
-node <本 skill 目录>/scripts/wc3-ranger.mjs doctor
-# → {"ok":true,...} 即就绪；ok:false 时按输出里的 advice 处理
-```
+## How it works
 
-> 兜底通道（可选）：`wc3-ranger cdp-start` 启动 CDP 代理（`:3456`），仅在 Extension 通道整体不可用时才需要。
+The fix: **explore once, distill it into a skill, rerun it for free.** Everything happens on your own machine, inside the agent you already use (Claude Code, workbuddy, qoderwork).
 
-## 安装
+**① Explore — figure out what you actually want.** Just point in a rough direction; the agent drives your real browser with this skill. Requirements are discovered by trying: watch the real output and adjust scope, filters, fields — until you can say *"this is exactly it."*
+
+**② Distill — one sentence turns it into a skill.** Say *"帮我提炼 / distill this into a skill."* The agent confirms the final requirements with you, then a **local generator** on your machine re-explores the site (using your own Chrome login state), generates the skill, and validates it with varied parameters. It runs in the background for tens of minutes. The webclaw3.com platform only steps in to check your generation quota and serve its site-knowledge base — it never sees your accounts.
+
+**③ Run daily — deterministic and free.** The generated skill is a plain script: no AI reasoning, **zero tokens**, millisecond response, identical results every run. Schedule it, rerun it any time.
+
+**④ Repair — also free.** When the site redesigns and a skill breaks, hand the error to your local agent; it fixes the skill locally, no charge.
+
+| | Raw AI | With a skill |
+|---|---|---|
+| Simple task (one-off) | $2 ~ $3 | $0 |
+| Complex task (one-off) | $5 ~ $10+ | $0 |
+| Daily task, per month | $60 ~ $300 | $0 |
+| Reliability | Hit or miss | Deterministic, consistent every time |
+
+## Quickstart
+
+You drive everything from inside your agent — Claude Code, workbuddy, or qoderwork all work. Here's the flow with Claude Code (other agents: [docs/clients](docs/clients)):
+
+**1. One-time setup.** Clone this repo into your agent's skills directory:
 
 ```bash
 git clone git@github.com:fatmind/wc3-ranger.git ~/.claude/skills/webclaw3
 ```
 
-## 设计哲学
+Then open Claude Code and say:
 
-> Skill = 哲学 + 技术事实，不是操作手册。讲清 tradeoff 让 AI 自己选，不替它推理。
+```
+帮我检查 webclaw3 环境
+```
 
-详见 [SKILL.md](./SKILL.md)。
+The agent starts the local services itself and, if the companion Chrome extension ([wc3-chrome](https://github.com/fatmind/wc3-chrome)) isn't installed yet, walks you through a one-time setup. Log into your usual sites in Chrome as you normally would — webclaw3 drives *your* browser with *your* login state; passwords never go through anyone.
+
+**2. Explore.** Describe a task roughly and let the agent run it for real:
+
+```
+帮我看看 SkillHub（https://skillhub.cn/）的下载热榜都有什么
+```
+
+Adjust as you watch (`每条加上下载量和评分` / `只要前 10 条`) until it's exactly what you want. This step spends your own agent's tokens — which is exactly why it's worth distilling: the run you're happy with should never cost you again.
+
+**3. Distill.** Say:
+
+```
+把刚才这个提炼成 skill，我以后要每天跑
+```
+
+The agent aligns the final requirements with you, shows you the requirement doc, and on your OK submits it to the local generator. The first time, it will ask you to log into [webclaw3.com](https://webclaw3.com) and grab an Access Key (one line in your project's `.webclaw3.env` — the agent does it for you). Generation takes tens of minutes in the background; the agent polls progress and installs the skill when it's done. Generation progress is also visible on webclaw3.com.
+
+**4. Run it daily:**
+
+```
+/skillhub-trending 跑一下今天的榜单
+```
+
+or schedule it (`每天早上 8 点自动跑 skillhub-trending`). Runs locally, fast, stable, ~zero tokens.
+
+**5. Something broke?** Paste the error to your agent — it repairs the skill locally, free.
+
+## Pricing
+
+- **Generating a skill**: 2 free per account, failures don't count
+- **Daily runs**: free — skills execute on your machine
+- **Repairs**: free — your local agent fixes them
+
+Details on [webclaw3.com](https://webclaw3.com).
+
+## Learn more
+
+- How the skill itself works (dual browser channels, Aria-tree semantics, `page.eval`): [docs/wc3-ranger-intro.md](docs/wc3-ranger-intro.md)
+- Using webclaw3 in [workbuddy](docs/clients/workbuddy.md) or [qoderwork](docs/clients/qoderwork.md)
 
 ## License
 
