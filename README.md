@@ -45,21 +45,15 @@ The fix: **explore once, distill it into a skill, rerun it for free.** Everythin
 
 ## Quickstart
 
-You drive everything from inside your agent — Claude Code, workbuddy, or qoderwork all work. Here's the flow with Claude Code (other agents: [docs/clients](docs/clients)):
+You never leave your agent's chat — Claude Code, workbuddy, or qoderwork all work. Everything below is things you *say*; the agent runs the commands.
 
-**1. One-time setup.** Clone this repo into your agent's skills directory:
-
-```bash
-git clone git@github.com:fatmind/wc3-ranger.git ~/.claude/skills/webclaw3
-```
-
-Then open Claude Code and say:
+**1. One-time setup.** Say to your agent:
 
 ```
-帮我检查 webclaw3 环境
+帮我安装 webclaw3（https://github.com/fatmind/wc3-ranger），装好检查一下环境
 ```
 
-The agent starts the local services itself and, if the companion Chrome extension ([wc3-chrome](https://github.com/fatmind/wc3-chrome)) isn't installed yet, walks you through a one-time setup. Log into your usual sites in Chrome as you normally would — webclaw3 drives *your* browser with *your* login state; passwords never go through anyone.
+The agent clones this repo into your skills directory, starts the local services, and — if the companion Chrome extension ([wc3-chrome](https://github.com/fatmind/wc3-chrome)) isn't installed yet — walks you through a one-time setup. Log into your usual sites in Chrome as you normally would: webclaw3 drives *your* browser with *your* login state, and passwords never go through anyone. Per-agent notes: [Claude Code](docs/claude-code.md) · [workbuddy](docs/workbuddy.md) · [qoderwork](docs/qoderwork.md)
 
 **2. Explore.** Describe a task roughly and let the agent run it for real:
 
@@ -98,7 +92,7 @@ Details on [webclaw3.com](https://webclaw3.com).
 ## Learn more
 
 - How the skill itself works (dual browser channels, Aria-tree semantics, `page.eval`): [docs/wc3-ranger-intro.md](docs/wc3-ranger-intro.md)
-- Using webclaw3 in [workbuddy](docs/clients/workbuddy.md) or [qoderwork](docs/clients/qoderwork.md)
+- Per-agent setup: [Claude Code](docs/claude-code.md) · [workbuddy](docs/workbuddy.md) · [qoderwork](docs/qoderwork.md)
 
 ## License
 

@@ -45,21 +45,15 @@
 
 ## 快速上手
 
-一切都在你的 Agent 里驱动——Claude Code、workbuddy、qoderwork 都可以。下面以 Claude Code 为例（其他 Agent 见 [docs/clients](docs/clients)）：
+你全程不用离开 Agent 的对话框——Claude Code、workbuddy、qoderwork 都可以。下面所有步骤都是你**说的话**，命令由 Agent 去跑。
 
-**1. 一次性准备。** 把本仓库 clone 到 Agent 的 skills 目录：
-
-```bash
-git clone git@github.com:fatmind/wc3-ranger.git ~/.claude/skills/webclaw3
-```
-
-然后打开 Claude Code，说一句：
+**1. 一次性准备。** 对你的 Agent 说一句：
 
 ```
-帮我检查 webclaw3 环境
+帮我安装 webclaw3（https://github.com/fatmind/wc3-ranger），装好检查一下环境
 ```
 
-Agent 会自动拉起本地服务；如果配套 Chrome 扩展（[wc3-chrome](https://github.com/fatmind/wc3-chrome)）还没装，会给你一次性的安装引导。之后用 Chrome 正常登录你常用的网站即可——webclaw3 用的是**你自己的浏览器和登录态**，账号密码不经过任何人。
+Agent 会把本仓库装进你的 skills 目录、拉起本地服务；如果配套 Chrome 扩展（[wc3-chrome](https://github.com/fatmind/wc3-chrome)）还没装，会给你一次性的安装引导。之后用 Chrome 正常登录你常用的网站即可——webclaw3 用的是**你自己的浏览器和登录态**，账号密码不经过任何人。各 Agent 的补充说明：[Claude Code](docs/claude-code.zh-CN.md) · [workbuddy](docs/workbuddy.zh-CN.md) · [qoderwork](docs/qoderwork.zh-CN.md)
 
 **2. 探索。** 说个大概方向，让 Agent 真实去跑：
 
@@ -98,7 +92,7 @@ Agent 会和你对齐最终需求、整理需求文档给你过目，你确认�
 ## 了解更多
 
 - 这个 skill 本身怎么工作（双通道触达浏览器、Aria 树语义、`page.eval`）：[docs/wc3-ranger-intro.zh-CN.md](docs/wc3-ranger-intro.zh-CN.md)
-- 在 [workbuddy](docs/clients/workbuddy.zh-CN.md) 或 [qoderwork](docs/clients/qoderwork.zh-CN.md) 里使用 webclaw3
+- 各 Agent 安装说明：[Claude Code](docs/claude-code.zh-CN.md) · [workbuddy](docs/workbuddy.zh-CN.md) · [qoderwork](docs/qoderwork.zh-CN.md)
 
 ## License
 
