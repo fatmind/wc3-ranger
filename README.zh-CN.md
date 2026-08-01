@@ -18,7 +18,7 @@
 - 考虑缓存命中浮动：Sonnet **单次 ≈ $2 ~ $3+**
 - Opus（$5/$25）同样任务 **$5 ~ $8+**；复杂任务多轮探索，轻松突破 $10
 
-每天跑一次，一个月就是 **$90+**——同样的步骤，每次从头重新思考。钱之外还有三个问题：
+每天跑一次，一个月就是 **$90+**——同样的步骤，每次从头重新思考。钱之外，还有 3 个麻烦事：
 
 - **每天都在烧钱。** 同一个网站、同样的操作，AI 每次都重新消耗百万级 tokens，像雇了一个每天失忆的员工。
 - **执行不稳定。** AI 浏览网页天然不稳定——同一个任务，这次成功，下次可能因为页面加载顺序不同就失败。
@@ -30,9 +30,9 @@
 
 **① 探索——把"自己要什么"搞清楚。** 说个大概方向就行，Agent 用本 skill 驱动你的真实浏览器去跑。需求是试出来的：看着真实结果调范围、调筛选、调字段，直到你拍板——**就是这个**。
 
-**② 提炼——一句话变成 skill。** 说"帮我提炼"。Agent 和你确认最终需求后，由你机器上的**本地生成器**重新探索网站（用你本地 Chrome 的登录态）、生成 skill、换参数验证，后台跑几十分钟。webclaw3.com 平台只做两件事：校验生成次数、提供站点经验库——不碰你的账号。
+**② 提炼——一句话变成 skill。** 说"帮我提炼"。Agent 和你确认最终需求后，**webclaw3** 用你本地 Chrome 的登录态重新探索网站、生成 skill、换参数验证，后台跑几十分钟——全在你自己机器上完成。
 
-**③ 日常跑——确定性、免费。** 生成的 skill 是纯脚本：不需要 AI 推理、**零 token**、毫秒级返回、每次结果一致。随时跑，也可以配成定时任务。
+**③ 日常跑——确定性、几乎免费。** 生成的 skill 是纯脚本，**零 token 或极少 token**、毫秒级返回、每次结果一致。随时跑，也可以配成定时任务。
 
 **④ 修复——也免费。** 网站改版导致 skill 失效时，把报错甩给本地 Agent，它直接在本地修好，不收费。
 
@@ -47,13 +47,18 @@
 
 你全程不用离开 Agent 的对话框——Claude Code、workbuddy、qoderwork 都可以。下面所有步骤都是你**说的话**，命令由 Agent 去跑。
 
-**1. 一次性准备。** 对你的 Agent 说一句：
+**1. 一次性准备。** 两件小事：
+
+- **装 Chrome 扩展**（要你自己点几下，一次就好）：从 [wc3-chrome](https://github.com/fatmind/wc3-chrome) 下载，`chrome://extensions` 开「开发者模式」→「加载已解压的扩展程序」→ 选 `extension/` 目录。
+- **到 [webclaw3.com](https://webclaw3.com) 登录拿 Access Key**：它是你的账号钥匙——生成 skill 扣次数、拉取**站点经验库**（别人探索过的站点结构沉淀，让你常做的网站生成更快更稳）都靠它。顺便提一句：回传你探索过的站点结构会积累积分，可兑换生成额度，越早越划算——详见[定价](#定价)。
+
+然后对你的 Agent 说一句：
 
 ```
 帮我安装 webclaw3（https://github.com/fatmind/wc3-ranger），装好检查一下环境
 ```
 
-Agent 会把本仓库装进你的 skills 目录、拉起本地服务；如果配套 Chrome 扩展（[wc3-chrome](https://github.com/fatmind/wc3-chrome)）还没装，会给你一次性的安装引导。之后用 Chrome 正常登录你常用的网站即可——webclaw3 用的是**你自己的浏览器和登录态**，账号密码不经过任何人。各 Agent 的补充说明：[Claude Code](docs/claude-code.zh-CN.md) · [workbuddy](docs/workbuddy.zh-CN.md) · [qoderwork](docs/qoderwork.zh-CN.md)
+Agent 会把本仓库装进你的 skills 目录、拉起本地服务，并引导你完成基本配置（填入刚拿的 Access Key、确认生成 skill 的存放目录等）。之后用 Chrome 正常登录你常用的网站即可——webclaw3 用的是**你自己的浏览器和登录态**，账号密码不经过任何人。各 Agent 的补充说明：[Claude Code](docs/claude-code.zh-CN.md) · [workbuddy](docs/workbuddy.zh-CN.md) · [qoderwork](docs/qoderwork.zh-CN.md)
 
 **2. 探索。** 说个大概方向，让 Agent 真实去跑：
 
@@ -69,7 +74,7 @@ Agent 会把本仓库装进你的 skills 目录、拉起本地服务；如果配
 把刚才这个提炼成 skill，我以后要每天跑
 ```
 
-Agent 会和你对齐最终需求、整理需求文档给你过目，你确认后提交给本地生成器。第一次会引导你去 [webclaw3.com](https://webclaw3.com) 登录拿 Access Key（在项目里写一行 `.webclaw3.env`——Agent 会帮你代办）。生成在后台跑几十分钟，Agent 自动轮询进展，完成后自动安装。生成进展也可以在 webclaw3.com 上查看。
+Agent 会和你对齐最终需求、整理需求文档给你过目，你确认后交给 webclaw3 在本地生成。生成在后台跑几十分钟，Agent 自动轮询进展，完成后自动安装。生成进展也可以在 [webclaw3.com](https://webclaw3.com) 上查看。
 
 **4. 日常跑：**
 
@@ -77,21 +82,28 @@ Agent 会和你对齐最终需求、整理需求文档给你过目，你确认�
 /skillhub-trending 跑一下今天的榜单
 ```
 
-或配成定时任务（`每天早上 8 点自动跑 skillhub-trending`）。本地执行，快、稳、几乎零 token。
+或配成定时任务（`每天早上 8 点自动跑 skillhub-trending`）。本地执行，快、稳、零 token 或极少 token。
 
-**5. 出问题了？** 把报错直接甩给 Agent——本地修复，免费。
+**5. 出问题了？** 也是一句话：
+
+```
+skillhub-trending 跑失败了，帮我修一下
+```
+
+Agent 在本地直接修，免费。
 
 ## 定价
 
 - **生成 skill**：每个账号免费 2 次，失败不扣
 - **日常运行**：免费——skill 在你本地跑
 - **失效修复**：免费——本地 Agent 直接修
+- **回传站点经验赚积分**：生成时回传的是站点网页结构，**不包含任何用户信息**。回传积累积分，可兑换生成额度；未来还有贡献度分成——越早开始越好，因为站点是有限的，先传先占
 
 细则见 [webclaw3.com](https://webclaw3.com)。
 
 ## 了解更多
 
-- 这个 skill 本身怎么工作（双通道触达浏览器、Aria 树语义、`page.eval`）：[docs/wc3-ranger-intro.zh-CN.md](docs/wc3-ranger-intro.zh-CN.md)
+- 这个 skill 本身怎么工作：[docs/wc3-ranger-intro.zh-CN.md](docs/wc3-ranger-intro.zh-CN.md)
 - 各 Agent 安装说明：[Claude Code](docs/claude-code.zh-CN.md) · [workbuddy](docs/workbuddy.zh-CN.md) · [qoderwork](docs/qoderwork.zh-CN.md)
 
 ## License

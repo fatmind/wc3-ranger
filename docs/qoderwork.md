@@ -4,13 +4,18 @@
 
 Everything happens in the qoderwork chat — you say things, it runs the commands.
 
+**0. Two one-time prerequisites** (only you can do these):
+
+- Install the Chrome extension: download [wc3-chrome](https://github.com/fatmind/wc3-chrome), open `chrome://extensions`, enable **Developer mode** → **Load unpacked** → pick the `extension/` directory
+- Log into [webclaw3.com](https://webclaw3.com) and grab your Access Key — it meters generation and unlocks the site-knowledge base
+
 **1. Install + check** — say:
 
 ```
 帮我安装 webclaw3（https://github.com/fatmind/wc3-ranger），装好检查一下环境
 ```
 
-qoderwork clones the repo into `~/.qoderwork/skills/webclaw3`, starts the local services, and guides you through the one-time [wc3-chrome](https://github.com/fatmind/wc3-chrome) extension setup if needed.
+qoderwork clones the repo into `~/.qoderwork/skills/webclaw3`, starts the local services, and walks you through the basic configuration (paste the Access Key, confirm the default directory for generated skills, etc.).
 
 **2. Use it** — from here everything is conversation:
 

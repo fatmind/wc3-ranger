@@ -4,13 +4,18 @@
 
 一切都在 Claude Code 的对话框里完成——你说话，它跑命令。
 
+**0. 两个一次性前置**（要你自己动手）：
+
+- 装 Chrome 扩展：从 [wc3-chrome](https://github.com/fatmind/wc3-chrome) 下载，`chrome://extensions` 开「开发者模式」→「加载已解压的扩展程序」→ 选 `extension/` 目录
+- 到 [webclaw3.com](https://webclaw3.com) 登录拿 Access Key——生成扣次数、拉站点经验库都靠它
+
 **1. 安装 + 检查环境**——说一句：
 
 ```
 帮我安装 webclaw3（https://github.com/fatmind/wc3-ranger），装好检查一下环境
 ```
 
-Claude Code 会把仓库装进 `~/.claude/skills/webclaw3`、拉起本地服务；[wc3-chrome](https://github.com/fatmind/wc3-chrome) 扩展没装的话会给你一次性引导。
+Claude Code 会把仓库装进 `~/.claude/skills/webclaw3`、拉起本地服务，并引导你完成基本配置（填入刚拿的 Access Key、确认生成 skill 的存放目录等）。
 
 **2. 开始使用**——之后全是对话：
 
