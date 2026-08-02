@@ -1,7 +1,7 @@
 ---
 name: webclaw3
 license: MIT
-github: https://github.com/fatmind/wc3-ranger
+github: https://github.com/fatmind/webclaw3
 description:
   帮用户上网干活，所有操作浏览器的活都走这个 skill。
   场景一（日常）：用户想搜个东西、看个网页、查个数据，或者要在网站里动手操作——点按钮、填表单、发内容、和商家聊天；包括要登录才能看的页面，如小红书、微博、推特等内容平台。

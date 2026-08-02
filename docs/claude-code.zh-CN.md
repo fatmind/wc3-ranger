@@ -12,7 +12,7 @@
 **1. 安装 + 检查环境**——说一句：
 
 ```
-帮我安装 webclaw3（https://github.com/fatmind/wc3-ranger），装好检查一下环境
+帮我安装 webclaw3（https://github.com/fatmind/webclaw3），装好检查一下环境
 ```
 
 Claude Code 会把仓库装进 `~/.claude/skills/webclaw3`、拉起本地服务，并引导你完成基本配置（填入刚拿的 Access Key、确认生成 skill 的存放目录等）。

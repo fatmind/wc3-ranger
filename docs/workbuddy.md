@@ -12,7 +12,7 @@ Everything happens in the workbuddy chat — you say things, it runs the command
 **1. Install + check** — say:
 
 ```
-Install webclaw3 (https://github.com/fatmind/wc3-ranger) for me, then check the environment
+Install webclaw3 (https://github.com/fatmind/webclaw3) for me, then check the environment
 ```
 
 workbuddy clones the repo into `~/.workbuddy/skills/webclaw3`, starts the local services, and walks you through the basic configuration (paste the Access Key, confirm the default directory for generated skills, etc.).

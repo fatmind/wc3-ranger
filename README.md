@@ -56,7 +56,7 @@ You never leave your agent's chat — Claude Code, workbuddy, or qoderwork all w
 Then say to your agent:
 
 ```
-Install webclaw3 (https://github.com/fatmind/wc3-ranger) for me, then check the environment
+Install webclaw3 (https://github.com/fatmind/webclaw3) for me, then check the environment
 ```
 
 The agent clones this repo into your skills directory, starts the local services, and walks you through the basic configuration (paste the Access Key you just got, etc.). One thing worth knowing: webclaw3 drives *your* browser with *your* login state — passwords never go through anyone.

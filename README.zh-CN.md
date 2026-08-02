@@ -56,7 +56,7 @@
 然后对你的 Agent 说一句：
 
 ```
-帮我安装 webclaw3（https://github.com/fatmind/wc3-ranger），装好检查一下环境
+帮我安装 webclaw3（https://github.com/fatmind/webclaw3），装好检查一下环境
 ```
 
 Agent 会把本仓库装进你的 skills 目录、拉起本地服务，并引导你完成基本配置（填入刚拿的 Access Key等）。提一句——webclaw3 用的是**你自己的浏览器和登录态**，账号密码不经过任何人。
