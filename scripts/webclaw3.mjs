@@ -14,6 +14,7 @@ import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
+import https from 'node:https';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RELAY_SCRIPT = join(__dirname, 'start-relay.mjs');
@@ -606,8 +607,9 @@ async function startPipelineCore(opts) {
 
 function checkQuota(appBase, ak) {
   return new Promise((resolve) => {
-    const url = new URL('/api/user', appBase || 'http://127.0.0.1:3003');
-    const req = http.get({ host: url.hostname, port: url.port, path: url.pathname, timeout: 3000, headers: { Authorization: `Bearer ${ak}` } }, (res) => {
+    const url = new URL('/api/user', appBase || 'https://webclaw3.com');
+    const mod = url.protocol === 'https:' ? https : http;
+    const req = mod.get({ host: url.hostname, port: url.port, path: url.pathname, timeout: 3000, headers: { Authorization: `Bearer ${ak}` } }, (res) => {
       let body = '';
       res.on('data', d => body += d);
       res.on('end', () => {
