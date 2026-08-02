@@ -232,8 +232,10 @@ function installPipelineFromDist(skillDir) {
       .pop();
     if (!tgz) return null;
     const tgzPath = join(distDir, tgz);
-    log(`生成器未安装，自动安装：npm i -g ${tgzPath}`);
+    log('检测到生成器尚未安装，正在自动安装，请稍候…');
+    // 底层执行 npm i -g <skillDir>/dist/wc3-pipeline-*.tgz（离线安装，无外部依赖）
     execFileSync('npm', ['i', '-g', tgzPath], { stdio: ['ignore', 'ignore', 'inherit'] });
+    log('生成器安装完成。');
     return findPipelineBinary();
   } catch (e) {
     log(`生成器自动安装失败：${e.message}`);
@@ -270,8 +272,8 @@ async function cmdPipelineStart(opts) {
     if (skillDir) binary = installPipelineFromDist(skillDir);
   }
   if (!binary) {
-    log("pipeline 未安装且自动安装失败（wc3-pipeline 不在 PATH）");
-    log('手动安装: npm i -g <本 skill 目录>/dist/wc3-pipeline-*.tgz（tarball 随 skill 仓库分发，就在 skillDir/dist/ 下）');
+    log('生成器组件安装失败，暂时无法启动。请重新运行一次诊断（doctor）重试；若仍失败，可联系支持。');
+    // 手动兜底（供排障，不打给普通用户）：npm i -g <skillDir>/dist/wc3-pipeline-*.tgz
     process.stdout.write(JSON.stringify({ installed: false, listening: false, error: 'pipeline-not-installed' }) + '\n');
     return 1;
   }
@@ -514,7 +516,7 @@ async function cmdDoctor(opts) {
   // 5. Code CLI：生成器 spawn 的 LLM（烧用户 token）
   const codeCli = detectCodeCli();
   if (!codeCli.found) {
-    advice.push(`未找到 Code CLI（${codeCli.command}）：先装 claude-code（npm i -g @anthropic-ai/claude-code 或按所用 AI 产品），生成器靠它跑 LLM`);
+    advice.push(`未检测到可用的 AI 编码工具（${codeCli.command}）：生成功能依赖它来跑，请先安装 claude-code（命令：npm i -g @anthropic-ai/claude-code），或安装你所用的同类 AI 产品`);
   }
 
   // 5a. codebuddy-code 双落 skills：WorkBuddy 把 skill 装在 ~/.workbuddy/skills/，
@@ -549,7 +551,7 @@ async function cmdDoctor(opts) {
     pipeline = await startPipelineCore(opts);
   }
   if (!pipelineInstalled) {
-    advice.push('生成器（wc3-pipeline）自动安装失败：手动跑 npm i -g <本 skill 目录>/dist/wc3-pipeline-*.tgz（tarball 随 skill 仓库分发，就在 skillDir/dist/ 下）');
+    advice.push('生成器组件自动安装失败：请重新运行一次诊断（doctor）重试；若仍失败，可联系支持。');
   } else if (!pipeline.listening) {
     advice.push(`生成器启动失败，看日志 ${PIPELINE_LOG_FILE}`);
   }
