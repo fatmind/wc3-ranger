@@ -6,7 +6,7 @@
 
 **0. 两个一次性前置**（要你自己动手）：
 
-- 装 Chrome 扩展：从 [wc3-chrome](https://github.com/fatmind/wc3-chrome) 下载，`chrome://extensions` 开「开发者模式」→「加载已解压的扩展程序」→ 选 `extension/` 目录
+- 装 Chrome 扩展：下载并解压 [wc3-chrome-extension-0.6.0.zip](https://github.com/fatmind/webclaw3/blob/main/dist/wc3-chrome-extension-0.6.0.zip)，打开 `chrome://extensions/` 开「开发者模式」→「加载已解压的扩展程序」→ 选刚解压后的文件夹
 - 到 [webclaw3.com](https://webclaw3.com) 登录拿 Access Key——生成扣次数、拉站点经验库都靠它
 
 **1. 安装 + 检查环境**——说一句：

@@ -6,7 +6,7 @@ Everything happens in the workbuddy chat — you say things, it runs the command
 
 **0. Two one-time prerequisites** (only you can do these):
 
-- Install the Chrome extension: download [wc3-chrome](https://github.com/fatmind/wc3-chrome), open `chrome://extensions`, enable **Developer mode** → **Load unpacked** → pick the `extension/` directory
+- Install the Chrome extension: download and unzip [wc3-chrome-extension-0.6.0.zip](https://github.com/fatmind/webclaw3/blob/main/dist/wc3-chrome-extension-0.6.0.zip), open `chrome://extensions/`, enable **Developer mode** → **Load unpacked** → pick the unzipped folder
 - Log into [webclaw3.com](https://webclaw3.com) and grab your Access Key — it meters generation and unlocks the site-knowledge base
 
 **1. Install + check** — say:

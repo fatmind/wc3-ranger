@@ -218,6 +218,28 @@ function findPipelineBinary() {
   } catch { return null; }
 }
 
+// 从 skill 目录的 dist/ 里就地安装生成器 tarball（随包分发、无依赖、离线可装）。
+// 成功返回 wc3-pipeline 二进制路径，失败返回 null。doctor 用它做"未装则自动装"，
+// 免去让用户手敲 npm i -g。
+function installPipelineFromDist(skillDir) {
+  try {
+    const distDir = join(skillDir, 'dist');
+    if (!existsSync(distDir)) return null;
+    const tgz = readdirSync(distDir)
+      .filter(f => /^wc3-pipeline-.*\.tgz$/.test(f))
+      .sort()
+      .pop();
+    if (!tgz) return null;
+    const tgzPath = join(distDir, tgz);
+    log(`生成器未安装，自动安装：npm i -g ${tgzPath}`);
+    execFileSync('npm', ['i', '-g', tgzPath], { stdio: ['ignore', 'ignore', 'inherit'] });
+    return findPipelineBinary();
+  } catch (e) {
+    log(`生成器自动安装失败：${e.message}`);
+    return null;
+  }
+}
+
 function readPipelinePidFile() {
   try {
     const v = parseInt(readFileSync(PIPELINE_PID_FILE, 'utf-8').trim(), 10);
@@ -241,10 +263,14 @@ function checkPipelinePort(timeoutMs = 1000) {
 }
 
 async function cmdPipelineStart(opts) {
-  const binary = findPipelineBinary();
+  let binary = findPipelineBinary();
   if (!binary) {
-    log("pipeline 未安装（wc3-pipeline 不在 PATH）");
-    log('安装: npm i -g <本 skill 目录>/dist/wc3-pipeline-*.tgz（tarball 随 skill 仓库分发，就在 skillDir/dist/ 下）');
+    const skillDir = readConfigValue('skillDir');
+    if (skillDir) binary = installPipelineFromDist(skillDir);
+  }
+  if (!binary) {
+    log("pipeline 未安装且自动安装失败（wc3-pipeline 不在 PATH）");
+    log('手动安装: npm i -g <本 skill 目录>/dist/wc3-pipeline-*.tgz（tarball 随 skill 仓库分发，就在 skillDir/dist/ 下）');
     process.stdout.write(JSON.stringify({ installed: false, listening: false, error: 'pipeline-not-installed' }) + '\n');
     return 1;
   }
@@ -471,11 +497,11 @@ async function cmdDoctor(opts) {
     } else {
       extInstalled = detectExtensionInstalled();
       if (extInstalled === false) {
-        advice.push('未检测到 wc3 扩展：先下载 https://github.com/fatmind/wc3-chrome → Chrome 打开 chrome://extensions → 开启「开发者模式」→「加载已解压的扩展程序」→ 选其中的 extension/ 目录');
+        advice.push('未检测到 wc3 扩展：下载 https://github.com/fatmind/webclaw3/blob/main/dist/wc3-chrome-extension-0.6.0.zip → 解压 zip → 打开 chrome://extensions/ → 右上角开「开发者模式」→「加载已解压的扩展程序」→ 选刚解压后的文件夹');
       } else if (extInstalled === true) {
         advice.push('扩展已安装但未连接：到 chrome://extensions 确认 wc3 未被禁用，点「重新加载」后等 20 秒重跑 doctor');
       } else {
-        advice.push('无法确认扩展是否安装：请打开 chrome://extensions 检查——没装则下载 https://github.com/fatmind/wc3-chrome 后开启「开发者模式」加载其 extension/ 目录；已装则确认 wc3 未被禁用并点「重新加载」，等 20 秒重跑 doctor');
+        advice.push('无法确认扩展是否安装：请打开 chrome://extensions 检查——没装则下载 https://github.com/fatmind/webclaw3/blob/main/dist/wc3-chrome-extension-0.6.0.zip，解压后开启「开发者模式」→「加载已解压的扩展程序」→ 选刚解压后的文件夹；已装则确认 wc3 未被禁用并点「重新加载」，等 20 秒重跑 doctor');
       }
     }
   }
@@ -510,8 +536,11 @@ async function cmdDoctor(opts) {
     }
   }
 
-  // 6. 生成器自身（wc3-pipeline :3460）：装了没跑则自动启动
-  const pipelineBinary = findPipelineBinary();
+  // 6. 生成器自身（wc3-pipeline :3460）：未装则从 dist/ 就地自动安装；装了没跑则自动启动
+  let pipelineBinary = findPipelineBinary();
+  if (!pipelineBinary) {
+    pipelineBinary = installPipelineFromDist(skillDir);
+  }
   const pipelineInstalled = !!pipelineBinary;
   let pipeline = await checkPipelinePort();
   if (pipelineInstalled && !pipeline.listening) {
@@ -519,7 +548,7 @@ async function cmdDoctor(opts) {
     pipeline = await startPipelineCore(opts);
   }
   if (!pipelineInstalled) {
-    advice.push('生成器（wc3-pipeline）未安装：npm i -g <本 skill 目录>/dist/wc3-pipeline-*.tgz（tarball 随 skill 仓库分发，就在 skillDir/dist/ 下）');
+    advice.push('生成器（wc3-pipeline）自动安装失败：手动跑 npm i -g <本 skill 目录>/dist/wc3-pipeline-*.tgz（tarball 随 skill 仓库分发，就在 skillDir/dist/ 下）');
   } else if (!pipeline.listening) {
     advice.push(`生成器启动失败，看日志 ${PIPELINE_LOG_FILE}`);
   }

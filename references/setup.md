@@ -21,7 +21,7 @@ doctor 按顺序检查，能自动修的自动修，修不了的在 `advice` 里
 | relay（:3459）监听 | 未启动则自动 start | 启动失败 → 看 /tmp/relay.log |
 | 扩展已连接 | 刚启动 relay 时等 25s（扩展每 20s 自动重连） | 见下方三种情况 |
 | Code CLI（生成用） | — | 未装 → 引导装 claude-code |
-| 生成器 wc3-pipeline（:3460） | 已装未跑则自动 start | 未装 → 引导装（见下）；启动失败 → 看 /tmp/wc3-pipeline.log |
+| 生成器 wc3-pipeline（:3460） | 未装则从 dist/ 自动安装、已装未跑则自动 start | 自动安装失败 → 手动装（见下）；启动失败 → 看 /tmp/wc3-pipeline.log |
 | AK 与剩余次数 | 读取并报告 | 未配 → 引导 `config ak`；为 0 → 去 wc3-app 购买 |
 
 扩展未连接时 doctor 会区分几种情况，照 advice 转告用户即可：
@@ -33,27 +33,30 @@ doctor 按顺序检查，能自动修的自动修，修不了的在 `advice` 里
 
 ## 扩展安装（用户一次性操作）
 
-扩展来自独立的 wc3-chrome 仓库：https://github.com/fatmind/wc3-chrome （git clone 或下载 zip 解压，位置用户自定）。引导用户在 Chrome 中操作：
+wc3-chrome 还没通过 Chrome 商店审核，走本地开发者模式装打包好的 zip——它随本 skill 仓库分发，就在 `dist/` 下（也可直接下载：https://github.com/fatmind/webclaw3/blob/main/dist/wc3-chrome-extension-0.6.0.zip）。引导用户：
 
-1. 打开 `chrome://extensions/`
-2. 右上角开启「**开发者模式**」
-3. 点「**加载已解压的扩展程序**」
-4. 选择下载的 wc3-chrome 里的 `extension/` 目录
+1. 下载并**解压 zip**
+2. 打开 `chrome://extensions/`
+3. 右上角开启「**开发者模式**」
+4. 点「**加载已解压的扩展程序**」
+5. 选刚解压后的文件夹
 
 装完后重跑 doctor，`ok:true` 即就绪。
 
 ## 生成器（wc3-pipeline）——本地生成
 
-阶段 2「提炼为 skill」需要生成器：在用户本地跑 explore/distill/validate/review，并提供 `:3460` 供 workbuddy 提交/轮询/拿安装。
+阶段 2「提炼为 skill」需要生成器：在用户本地跑 explore/distill/validate/review。
 
-**安装**（需 Node 22+）：生成器的安装包（tarball）随本 skill 仓库一起分发——它就放在本 skill 目录的 `dist/` 下，`git clone` skill 时已经一并下来了，直接本地 `npm i -g` 即可，无需另外下载或托管：
+**安装（doctor 全自动，用户零操作）**（需 Node 22+）：生成器的安装包（tarball）随本 skill 仓库一起分发——它就放在本 skill 目录的 `dist/` 下，`git clone` skill 时已经一并下来了。这个 tarball 无外部依赖、离线可装，所以 **doctor 检测到未安装时会直接 `npm i -g` 就地装好，不再提示用户手动敲命令**，装完顺带自动启动。
+
+只有 doctor 自动安装失败（如 npm 全局目录无写权限）时，才需要手动兜底：
 
 ```bash
 # <本 skill 目录> 即 doctor 登记的 skillDir，dist/ 下是随包分发的版本化 tarball
 npm i -g <本 skill 目录>/dist/wc3-pipeline-*.tgz
 ```
 
-装完包就写好了 `config.json` 的 `pipeline.entry`，doctor 会检测到、装了未跑时自动启动。手动管理：
+doctor 会检测到、装了未跑时自动启动。手动管理：
 
 ```bash
 webclaw3 pipeline-start / -stop / -status / -restart
