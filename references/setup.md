@@ -1,16 +1,16 @@
 # 环节①：安装启动
 
-> 什么时候读这个文件：首次使用，或 `wc3-ranger doctor` 返回 `ok:false` 需要引导用户处理。
+> 什么时候读这个文件：首次使用，或 `webclaw3 doctor` 返回 `ok:false` 需要引导用户处理。
 
 两条铁律，避免对用户制造噪音：
 
 1. **skill 安装完成后直接跑 doctor**，不要问用户"要不要验证/检查"——跑完拿结果说话
-2. **CLI 用 node 直接跑**：`node <本 skill 目录>/scripts/wc3-ranger.mjs doctor`。不存在"没在 PATH 上"的问题，**不要提议 npm link / 全局安装 / 改 PATH**
+2. **CLI 用 node 直接跑**：`node <本 skill 目录>/scripts/webclaw3.mjs doctor`。不存在"没在 PATH 上"的问题，**不要提议 npm link / 全局安装 / 改 PATH**
 
 ## 一条命令诊断
 
 ```bash
-node <本 skill 目录>/scripts/wc3-ranger.mjs doctor
+node <本 skill 目录>/scripts/webclaw3.mjs doctor
 ```
 
 doctor 按顺序检查，能自动修的自动修，修不了的在 `advice` 里给出人话建议。另外 doctor 每次会把本 skill 的安装路径登记到 `~/.webclaw3/config.json`（`skillDir`）——电脑上装了多个 AI 产品、存在多份 skill 目录时，webclaw3 各组件以这里为唯一定位，以最近一次跑 doctor 的为准。
@@ -58,13 +58,13 @@ npm i -g wc3-pipeline
 装完包就写好了 `config.json` 的 `pipeline.entry`，doctor 会检测到、装了未跑时自动启动。手动管理：
 
 ```bash
-wc3-ranger pipeline-start / -stop / -status / -restart
+webclaw3 pipeline-start / -stop / -status / -restart
 ```
 
 **配置 AK**：生成/拉站点经验/回传经验都要 AK（扣次数）。在 wc3-app 网页登录后获取，然后：
 
 ```bash
-wc3-ranger config ak <access-key> [--app-base <wc3-app 地址>]
+webclaw3 config ak <access-key> [--app-base <wc3-app 地址>]
 ```
 
 ## 边界

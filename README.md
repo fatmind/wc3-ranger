@@ -105,7 +105,7 @@ Details on [webclaw3.com](https://webclaw3.com).
 ## Learn more
 
 - Per-agent guides: [Claude Code](docs/claude-code.md) · [workbuddy](docs/workbuddy.md) · [qoderwork](docs/qoderwork.md)
-- How the skill itself works: [docs/wc3-ranger-intro.md](docs/wc3-ranger-intro.md)
+- How the skill itself works: [docs/webclaw3-intro.md](docs/webclaw3-intro.md)
 
 ## License
 

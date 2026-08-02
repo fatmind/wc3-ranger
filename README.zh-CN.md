@@ -105,7 +105,7 @@ webclaw3 在本地直接修。
 ## 了解更多
 
 - 各 Agent 使用说明：[Claude Code](docs/claude-code.zh-CN.md) · [workbuddy](docs/workbuddy.zh-CN.md) · [qoderwork](docs/qoderwork.zh-CN.md)
-- 这个 skill 本身怎么工作：[docs/wc3-ranger-intro.zh-CN.md](docs/wc3-ranger-intro.zh-CN.md)
+- 这个 skill 本身怎么工作：[docs/webclaw3-intro.zh-CN.md](docs/webclaw3-intro.zh-CN.md)
 
 
 ## License

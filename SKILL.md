@@ -28,22 +28,22 @@ webclaw3 覆盖「探索 → 提炼 → 日常跑 → 修复」完整动线，�
 
 ## 前置检查
 
-本 skill 的 CLI 就在 skill 目录的 `scripts/` 下，用 node 直接跑——**不需要也不要做任何 PATH / npm link / 全局安装**，也不要向用户提议。下文所有 `wc3-ranger <子命令>` 写法均指：
+本 skill 的 CLI 就在 skill 目录的 `scripts/` 下，用 node 直接跑——**不需要也不要做任何 PATH / npm link / 全局安装**，也不要向用户提议。下文所有 `webclaw3 <子命令>` 写法均指：
 
 ```bash
-node <本 skill 目录>/scripts/wc3-ranger.mjs <子命令>
+node <本 skill 目录>/scripts/webclaw3.mjs <子命令>
 ```
 
 skill 安装完成后、以及每次开始联网操作前，**直接跑下面这条，不用询问用户要不要检查**：
 
 ```bash
-node <本 skill 目录>/scripts/wc3-ranger.mjs doctor
+node <本 skill 目录>/scripts/webclaw3.mjs doctor
 # → {"ok":true,...} 即可开始操作
 ```
 
 doctor 会自动拉起 relay；`ok:false` 时输出里有 advice（Chrome 没开 / 扩展未装 / 被禁用等），需要引导用户人工处理的场景 Read `references/setup.md`。
 
-> 本 skill 的脚本（relay、cdp-proxy、wc3-ranger CLI）全部在 skill 目录的 `scripts/` 下，自包含；Chrome 扩展是独立安装的 wc3-chrome（安装方式见 `references/setup.md`）。
+> 本 skill 的脚本（relay、cdp-proxy、webclaw3 CLI）全部在 skill 目录的 `scripts/` 下，自包含；Chrome 扩展是独立安装的 wc3-chrome（安装方式见 `references/setup.md`）。
 
 ## 浏览哲学
 
@@ -185,7 +185,7 @@ async function relayCall(op, params = {}, timeout = 30000) {
 
 ### 错误处理
 
-- 扩展未加载 → `/api/status` 返回 `extensionConnected: false`，跑 `wc3-ranger doctor` 按 advice 引导用户（详见 `references/setup.md`）
+- 扩展未加载 → `/api/status` 返回 `extensionConnected: false`，跑 `webclaw3 doctor` 按 advice 引导用户（详见 `references/setup.md`）
 - 扩展被禁用/Service Worker 挂掉 → 第一次 op 返回错误，提示用户检查 `chrome://extensions/`
 - `page.eval` 抛错 → 直接拿到 JS 异常信息（含 className、message、stack），修复脚本重试
 

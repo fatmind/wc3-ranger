@@ -6,7 +6,7 @@
 
 ## 启动
 
-CDP 通道需单独启动：`wc3-ranger cdp-start`（监听 `:3456`，底层 Chrome `--remote-debugging-port=9222`）。只用 Extension Relay 时无需启动它。
+CDP 通道需单独启动：`webclaw3 cdp-start`（监听 `:3456`，底层 Chrome `--remote-debugging-port=9222`）。只用 Extension Relay 时无需启动它。
 
 ## tab ID 映射
 

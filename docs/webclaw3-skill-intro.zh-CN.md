@@ -1,6 +1,6 @@
 # webclaw3 skill 内部
 
-[English](./wc3-ranger-intro.md) | **中文**
+[English](./webclaw3-intro.md) | **中文**
 
 这页给想深入了解这个 skill 到底是什么的人。产品故事和用法看 [README](../README.zh-CN.md)。
 
@@ -20,7 +20,7 @@ webclaw3 以一个独立 skill 的形态交付（仓库名 `webclaw3`，安装�
 | Extension Relay | `scripts/relay.mjs` | **默认主通道。** 桥接到 [wc3-chrome](https://github.com/fatmind/wc3-chrome) MV3 扩展（HTTP :3459 ↔ WebSocket ↔ 插件）。 |
 | CDP 兜底 | `scripts/cdp-proxy.mjs` | **兜底通道。** 直连 Chrome DevTools Protocol（HTTP :3456 ↔ :9222），仅在 Extension 通道整体不可用时启用。 |
 
-`scripts/wc3-ranger.mjs` 负责两者的启停和 `doctor` 健康检查——你说"帮我检查 webclaw3 环境"时 Agent 调的就是它。页面内真正的执行者是 wc3-chrome 扩展（L0）；本 skill 依赖它，但自带连接脚本，可独立运行。
+`scripts/webclaw3.mjs` 负责两者的启停和 `doctor` 健康检查——你说"帮我检查 webclaw3 环境"时 Agent 调的就是它。页面内真正的执行者是 wc3-chrome 扩展（L0）；本 skill 依赖它，但自带连接脚本，可独立运行。
 
 ## 能力
 

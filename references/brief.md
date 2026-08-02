@@ -75,11 +75,11 @@ wc3-brief/<skill名>/
 
 ### 第 4 步：提交本地生成器，轮询到安装
 
-**前置**：生成器（wc3-pipeline）必须已安装且运行中。装完跑一次 `wc3-ranger doctor`，`ready.generate:true` 即可。
+**前置**：生成器（wc3-pipeline）必须已安装且运行中。装完跑一次 `webclaw3 doctor`，`ready.generate:true` 即可。
 
-**配置**（`~/.webclaw3/config.json`，由 `wc3-ranger config ak` 写入）：
+**配置**（`~/.webclaw3/config.json`，由 `webclaw3 config ak` 写入）：
 
-- `ak`：wc3-app 登录后获取的 Access Key（`wc3_` 前缀）。缺失时引导用户去 wc3-app 网页登录后复制，跑 `wc3-ranger config ak <key>`。
+- `ak`：wc3-app 登录后获取的 Access Key（`wc3_` 前缀）。缺失时引导用户去 wc3-app 网页登录后复制，跑 `webclaw3 config ak <key>`。
 - `appBase`：wc3-app 地址，默认 `http://127.0.0.1:3003`（开发期）；可依实际部署改。
 
 **提交**（本地 http，无鉴权——信任边界在本地）：

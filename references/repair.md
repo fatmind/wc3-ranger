@@ -10,7 +10,7 @@
 
 1. **看现场**：读 skill 输出目录的 `res.json`（error 字段）和 stderr。skill 的调用契约：`node skill.mjs <input.json>`，产出 `res.json` + `data.md`
 2. **先排除环境问题**（这类不用改代码）：
-   - `wc3-ranger doctor` 不通过 → 按 advice 处理通道问题
+   - `webclaw3 doctor` 不通过 → 按 advice 处理通道问题
    - 登录态过期（页面跳登录/内容拿不到）→ 请用户在 Chrome 登录目标站点后直接重跑
    - 站点临时错误（5xx、偶发超时）→ 稍后重跑一次再下结论
 3. **改代码**：环境没问题就是 skill 与页面对不上了（改版、选择器失效、新增弹窗）。用浏览器打开目标页面 inspect 真实 DOM，对着改 `skill.mjs`——按 SKILL.md 探索方法定位，不要凭想象猜选择器

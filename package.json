@@ -5,7 +5,7 @@
   "type": "module",
   "main": "scripts/relay.mjs",
   "bin": {
-    "wc3-ranger": "scripts/wc3-ranger.mjs"
+    "webclaw3": "scripts/webclaw3.mjs"
   },
   "scripts": {
     "start": "node scripts/start-relay.mjs",

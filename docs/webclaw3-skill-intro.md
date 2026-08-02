@@ -1,6 +1,6 @@
 # Inside the webclaw3 skill
 
-**English** | [中文](./wc3-ranger-intro.zh-CN.md)
+**English** | [中文](./webclaw3-intro.zh-CN.md)
 
 This page is for people who want to know what the skill actually is under the hood. For the product story and usage, see the [README](../README.md).
 
@@ -20,7 +20,7 @@ Both channels drive the same real Chrome with equivalent capability; the skill p
 | Extension Relay | `scripts/relay.mjs` | **Default.** Bridges to the [wc3-chrome](https://github.com/fatmind/wc3-chrome) MV3 extension (HTTP :3459 ↔ WebSocket ↔ extension). |
 | CDP fallback | `scripts/cdp-proxy.mjs` | **Fallback.** Talks to Chrome DevTools Protocol directly (HTTP :3456 ↔ :9222), used when the extension channel is entirely unavailable. |
 
-`scripts/wc3-ranger.mjs` starts/stops both and runs the `doctor` health check that the agent calls when you say "check my webclaw3 environment". The actual execution inside the page is done by the wc3-chrome extension (L0); this skill depends on it but carries its own connection scripts, so it runs standalone.
+`scripts/webclaw3.mjs` starts/stops both and runs the `doctor` health check that the agent calls when you say "check my webclaw3 environment". The actual execution inside the page is done by the wc3-chrome extension (L0); this skill depends on it but carries its own connection scripts, so it runs standalone.
 
 ## Capabilities
 

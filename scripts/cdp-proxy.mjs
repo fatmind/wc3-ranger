@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // CDP Proxy - 通过 HTTP API 操控用户日常 Chrome
-// wc3-ranger 增强版：新增 Aria 树接口 + 请求日志
+// webclaw3 增强版：新增 Aria 树接口 + 请求日志
 // Node.js 22+（使用原生 WebSocket）
 
 import http from 'node:http';

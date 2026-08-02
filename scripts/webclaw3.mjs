@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// wc3-ranger — L0 层（Relay + CDP Proxy）启停与健康检查
+// webclaw3 — L0 层（Relay + CDP Proxy）启停与健康检查
 //
 // 子命令：start | stop | status | restart | doctor
 //         cdp-start | cdp-stop | cdp-status | cdp-restart
@@ -29,28 +29,28 @@ const LOG_FILE = '/tmp/relay.log';
 const CDP_LOG_FILE = '/tmp/cdp-proxy.log';
 
 function log(msg) {
-  process.stderr.write(`[wc3-ranger] ${msg}\n`);
+  process.stderr.write(`[webclaw3] ${msg}\n`);
 }
 
 function printUsage() {
-  process.stdout.write(`wc3-ranger — L0 层（Relay + CDP Proxy）启停与健康检查
+  process.stdout.write(`webclaw3 — L0 层（Relay + CDP Proxy）启停与健康检查
 
 Usage:
-  wc3-ranger doctor [--port 3459]
-  wc3-ranger start [--port 3459] [--wait 10]
-  wc3-ranger stop [--port 3459]
-  wc3-ranger status [--port 3459] [--timeout 5]
-  wc3-ranger restart [--port 3459] [--wait 10]
-  wc3-ranger cdp-start [--port 3456] [--wait 10]
-  wc3-ranger cdp-stop [--port 3456]
-  wc3-ranger cdp-status [--port 3456] [--timeout 5]
-  wc3-ranger cdp-restart [--port 3456] [--wait 10]
-  wc3-ranger pipeline-start [--wait 10]
-  wc3-ranger pipeline-stop
-  wc3-ranger pipeline-status [--timeout 5]
-  wc3-ranger pipeline-restart
-  wc3-ranger config ak <access-key> [--app-base <url>]
-  wc3-ranger -h | --help
+  webclaw3 doctor [--port 3459]
+  webclaw3 start [--port 3459] [--wait 10]
+  webclaw3 stop [--port 3459]
+  webclaw3 status [--port 3459] [--timeout 5]
+  webclaw3 restart [--port 3459] [--wait 10]
+  webclaw3 cdp-start [--port 3456] [--wait 10]
+  webclaw3 cdp-stop [--port 3456]
+  webclaw3 cdp-status [--port 3456] [--timeout 5]
+  webclaw3 cdp-restart [--port 3456] [--wait 10]
+  webclaw3 pipeline-start [--wait 10]
+  webclaw3 pipeline-stop
+  webclaw3 pipeline-status [--timeout 5]
+  webclaw3 pipeline-restart
+  webclaw3 config ak <access-key> [--app-base <url>]
+  webclaw3 -h | --help
 
 Relay Commands:
   doctor   一条命令分层诊断：Node 版本 → relay（未启动则自动 start）→ 扩展连接
@@ -320,7 +320,7 @@ async function cmdConfig(args) {
   const key = args[0];
   const value = args[1];
   if (!key || !value) {
-    log('用法: wc3-ranger config ak <access-key> [--app-base <url>]');
+    log('用法: webclaw3 config ak <access-key> [--app-base <url>]');
     log('AK 在 wc3-app 网页登录后获取（生成/拉经验/回传需要）');
     return 1;
   }
@@ -480,7 +480,7 @@ async function cmdDoctor(opts) {
   const ak = readConfigValue('ak');
   let quota = null;
   if (!ak) {
-    advice.push('未配置 AK：wc3-app 网页登录后获取，然后跑 wc3-ranger config ak <key>（生成会扣次数）');
+    advice.push('未配置 AK：wc3-app 网页登录后获取，然后跑 webclaw3 config ak <key>（生成会扣次数）');
   } else {
     quota = await checkQuota(readConfigValue('appBase'), ak);
     if (quota?.error) advice.push(`AK 校验失败（${quota.error}）：重新获取或确认 wc3-app 地址`);
