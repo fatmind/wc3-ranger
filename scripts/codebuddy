@@ -1,0 +1,43 @@
+#!/bin/bash
+# codebuddy shim —— 复用 WorkBuddy 内置的 CodeBuddy CLI
+#
+# 背景：WorkBuddy.app 内置完整 CodeBuddy CLI（已登录、零额外费用），但不在 PATH 上，
+# 且需要 node >= 18.20.8（app 自带，在 ~/.workbuddy/binaries/node/versions/ 下）。
+# 本 shim 负责定位两者并转发调用，供 wc3-pipeline 的 codebuddy-code provider 使用
+# （~/.webclaw3/config.json 的 codeCli.command 指向本脚本）。
+#
+# 路径不做硬编码版本号：node 取 versions/ 下 semver 最大者；app 支持系统/用户级安装。
+# 找不到时 stderr 给明确原因，退出码 1。
+
+set -u
+
+# 1. 定位 WorkBuddy 内置 CLI
+CLI=""
+for app in "/Applications/WorkBuddy.app" "$HOME/Applications/WorkBuddy.app"; do
+  cand="$app/Contents/Resources/app.asar.unpacked/cli/bin/codebuddy"
+  if [ -f "$cand" ]; then CLI="$cand"; break; fi
+done
+if [ -z "$CLI" ]; then
+  echo "[codebuddy-shim] 未找到 WorkBuddy 内置 CLI（/Applications 或 ~/Applications 下无 WorkBuddy.app）" >&2
+  exit 1
+fi
+
+# 2. 定位 node：versions/ 下取 semver 最大
+NODE=""
+NODE_VER=""
+for bin in "$HOME"/.workbuddy/binaries/node/versions/*/bin/node; do
+  [ -x "$bin" ] || continue
+  ver=$(basename "$(dirname "$(dirname "$bin")")")
+  if [ -z "$NODE_VER" ]; then
+    NODE="$bin"; NODE_VER="$ver"; continue
+  fi
+  # 两者取大：sort 按 . 分段的数值序，尾部为最大
+  larger=$(printf '%s\n%s\n' "$NODE_VER" "$ver" | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+  if [ "$larger" = "$ver" ]; then NODE="$bin"; NODE_VER="$ver"; fi
+done
+if [ -z "$NODE" ]; then
+  echo "[codebuddy-shim] 未找到 WorkBuddy 自带 node（~/.workbuddy/binaries/node/versions/ 为空）" >&2
+  exit 1
+fi
+
+exec "$NODE" "$CLI" "$@"

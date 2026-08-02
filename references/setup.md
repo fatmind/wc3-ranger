@@ -46,13 +46,11 @@ doctor 按顺序检查，能自动修的自动修，修不了的在 `advice` 里
 
 阶段 2「提炼为 skill」需要生成器：在用户本地跑 explore/distill/validate/review，并提供 `:3460` 供 workbuddy 提交/轮询/拿安装。
 
-**安装**（二选一，都要 Node 22+）：
+**安装**（需 Node 22+）：生成器的安装包（tarball）随本 skill 仓库一起分发——它就放在本 skill 目录的 `dist/` 下，`git clone` skill 时已经一并下来了，直接本地 `npm i -g` 即可，无需另外下载或托管：
 
 ```bash
-# 方式 1（curl）
-curl -fsSL <托管地址>/install.sh | bash
-# 方式 2（npm）
-npm i -g wc3-pipeline
+# <本 skill 目录> 即 doctor 登记的 skillDir，dist/ 下是随包分发的版本化 tarball
+npm i -g <本 skill 目录>/dist/wc3-pipeline-*.tgz
 ```
 
 装完包就写好了 `config.json` 的 `pipeline.entry`，doctor 会检测到、装了未跑时自动启动。手动管理：

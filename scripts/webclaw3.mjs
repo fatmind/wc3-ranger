@@ -9,7 +9,7 @@
 // 退出码：0=端口监听中（status）、spawn 成功（start）、通道就绪（doctor）；1=异常
 
 import { spawn, execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, openSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, openSync, readdirSync, symlinkSync, readlinkSync, lstatSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -244,7 +244,7 @@ async function cmdPipelineStart(opts) {
   const binary = findPipelineBinary();
   if (!binary) {
     log("pipeline 未安装（wc3-pipeline 不在 PATH）");
-    log('安装: ①curl -fsSL <托管地址>/install.sh | bash  ②npm i -g wc3-pipeline');
+    log('安装: npm i -g <本 skill 目录>/dist/wc3-pipeline-*.tgz（tarball 随 skill 仓库分发，就在 skillDir/dist/ 下）');
     process.stdout.write(JSON.stringify({ installed: false, listening: false, error: 'pipeline-not-installed' }) + '\n');
     return 1;
   }
@@ -389,14 +389,42 @@ function readConfigValue(key) {
   } catch { return null; }
 }
 
-// 探测 Code CLI：config.codeCli.command（doctor 安装时注册），spawn `--version` 验证可用
-// 探不到时用 PATH 上常见的 'claude'（多数用户直接装 claude-code）
+// 探测 Code CLI：生成器 spawn 的 LLM。优先级：
+//   1. config.codeCli.command（已注册）且可用 → 直接用
+//   2. PATH 上的 claude / codebuddy / qodercli
+//   3. WorkBuddy 内置 CLI（同目录 codebuddy shim，复用 WorkBuddy 登录态，用户零安装零费用）
+// 探测到可用项时幂等回写 config.codeCli（含覆盖已失效的旧配置）
 function detectCodeCli() {
-  const command = readConfigValue('codeCli')?.command || 'claude';
-  try {
-    const version = execFileSync(command, ['--version'], { encoding: 'utf-8' }).trim();
-    return { command, found: true, version };
-  } catch { return { command, found: false, version: null }; }
+  const candidates = [
+    { type: 'claude-code', command: 'claude' },
+    { type: 'codebuddy-code', command: 'codebuddy' },
+    { type: 'qoder-code', command: 'qodercli' },
+    { type: 'codebuddy-code', command: join(__dirname, 'codebuddy') },  // WorkBuddy 内置 shim
+  ];
+  const registered = readConfigValue('codeCli');
+
+  const probe = (command) => {
+    try { return execFileSync(command, ['--version'], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); }
+    catch { return null; }
+  };
+
+  if (registered?.command) {
+    const version = probe(registered.command);
+    if (version) return { type: registered.type || null, command: registered.command, found: true, version };
+    log(`registered codeCli 不可用（${registered.command}），重新探测...`);
+  }
+
+  for (const c of candidates) {
+    const version = probe(c.command);
+    if (!version) continue;
+    if (!registered || registered.command !== c.command || registered.type !== c.type) {
+      writeConfig({ codeCli: { type: c.type, command: c.command } });
+      log(`codeCli registered: ${c.type} → ${c.command}`);
+    }
+    return { type: c.type, command: c.command, found: true, version };
+  }
+  const fallback = registered?.command || 'claude';
+  return { type: registered?.type || null, command: fallback, found: false, version: null };
 }
 
 async function cmdDoctor(opts) {
@@ -462,6 +490,26 @@ async function cmdDoctor(opts) {
     advice.push(`未找到 Code CLI（${codeCli.command}）：先装 claude-code（npm i -g @anthropic-ai/claude-code 或按所用 AI 产品），生成器靠它跑 LLM`);
   }
 
+  // 5a. codebuddy-code 双落 skills：WorkBuddy 把 skill 装在 ~/.workbuddy/skills/，
+  //     但 spawn 出的 codebuddy CLI 读 ~/.codebuddy/skills/，需 symlink
+  if (codeCli.type === 'codebuddy-code') {
+    const codebuddySkills = join(homedir(), '.codebuddy', 'skills');
+    const codebuddySkillLink = join(codebuddySkills, 'webclaw3');
+    try {
+      let cur = null;
+      try { cur = existsSync(codebuddySkillLink) && lstatSync(codebuddySkillLink).isSymbolicLink() ? readlinkSync(codebuddySkillLink) : null; }
+      catch { /* 路径不存在或无权限 */ }
+      if (cur !== skillDir) {
+        mkdirSync(codebuddySkills, { recursive: true });
+        try { unlinkSync(codebuddySkillLink); } catch {}
+        symlinkSync(skillDir, codebuddySkillLink);
+        log(`codebuddy skills symlink: ${codebuddySkillLink} → ${skillDir}`);
+      }
+    } catch (e) {
+      advice.push(`无法创建 ~/.codebuddy/skills/webclaw3 软链（${e.message}），explore 子会话可能加载不到 webclaw3 skill`);
+    }
+  }
+
   // 6. 生成器自身（wc3-pipeline :3460）：装了没跑则自动启动
   const pipelineBinary = findPipelineBinary();
   const pipelineInstalled = !!pipelineBinary;
@@ -471,7 +519,7 @@ async function cmdDoctor(opts) {
     pipeline = await startPipelineCore(opts);
   }
   if (!pipelineInstalled) {
-    advice.push('生成器（wc3-pipeline）未安装：①curl -fsSL <托管地址>/install.sh | bash  ②npm i -g wc3-pipeline');
+    advice.push('生成器（wc3-pipeline）未安装：npm i -g <本 skill 目录>/dist/wc3-pipeline-*.tgz（tarball 随 skill 仓库分发，就在 skillDir/dist/ 下）');
   } else if (!pipeline.listening) {
     advice.push(`生成器启动失败，看日志 ${PIPELINE_LOG_FILE}`);
   }
