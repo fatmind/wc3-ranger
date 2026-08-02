@@ -1,4 +1,4 @@
-# Inside the webclaw3 skill (wc3-ranger)
+# Inside the webclaw3 skill
 
 **English** | [中文](./wc3-ranger-intro.zh-CN.md)
 
@@ -6,7 +6,7 @@ This page is for people who want to know what the skill actually is under the ho
 
 ## What it is
 
-webclaw3 ships as a single self-contained skill (repo name: `wc3-ranger`, installed as `~/.claude/skills/webclaw3`). It has two parts:
+webclaw3 ships as a single self-contained skill (repo name: `webclaw3`, installed as `~/.claude/skills/webclaw3`). It has two parts:
 
 - **`SKILL.md`** — the browsing philosophy and operating guidance the agent reads: goal-driven navigation, verify-as-you-go, adapt when a path is blocked. Skill = philosophy + technical facts, not a runbook; it explains tradeoffs and lets the agent reason.
 - **`scripts/`** — the connection layer that actually reaches your browser. Without it the skill can think but not act.

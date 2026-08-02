@@ -1,4 +1,4 @@
-# webclaw3 skill 内部（wc3-ranger）
+# webclaw3 skill 内部
 
 [English](./wc3-ranger-intro.md) | **中文**
 
@@ -6,7 +6,7 @@
 
 ## 它是什么
 
-webclaw3 以一个独立 skill 的形态交付（仓库名 `wc3-ranger`，安装为 `~/.claude/skills/webclaw3`），由两部分组成：
+webclaw3 以一个独立 skill 的形态交付（仓库名 `webclaw3`，安装为 `~/.claude/skills/webclaw3`），由两部分组成：
 
 - **`SKILL.md`**——Agent 会读的浏览哲学与操作指引：目标导向、过程校验、条件不可达时灵活调整。Skill = 哲学 + 技术事实，不是操作手册；讲清 tradeoff，让 AI 自己推理。
 - **`scripts/`**——真正触达浏览器的连接层。没有它，skill 会想不能动。
