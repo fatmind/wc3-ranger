@@ -418,10 +418,50 @@ function readConfigValue(key) {
   } catch { return null; }
 }
 
+// 剥离宿主注入的 QODER* 环境变量。若 webclaw3 由 QoderWork 启动，宿主会注入
+// QODER_AGENT_SDK_ENTRYPOINT 等，会让内置 qodercli 强切 SDK 模式或配置目录错位；
+// 探测/登录检查一律用干净 env，等同「终端手敲」。对 claude/codebuddy 无副作用。
+function cleanQoderEnv() {
+  return Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^QODER/.test(k)));
+}
+
+// QoderWork 内置的 qodercli 不在 PATH、也不建 symlink，只能按 app 包绝对路径找。
+// 返回实际存在的候选路径（按平台已知位置探测）。
+function qoderworkBuiltinCliPaths() {
+  const paths = [];
+  if (process.platform === 'darwin') {
+    paths.push('/Applications/QoderWork.app/Contents/Resources/bin/qodercli');
+    paths.push(join(homedir(), 'Applications', 'QoderWork.app', 'Contents', 'Resources', 'bin', 'qodercli'));
+  } else if (process.platform === 'win32') {
+    const la = process.env.LOCALAPPDATA;
+    if (la) paths.push(join(la, 'Programs', 'QoderWork', 'resources', 'bin', 'qodercli.exe'));
+    paths.push(join('C:', 'Program Files', 'QoderWork', 'resources', 'bin', 'qodercli.exe'));
+  } else {
+    // linux（若发行）：常见 electron 布局
+    paths.push('/opt/QoderWork/resources/bin/qodercli');
+    paths.push(join(homedir(), '.local', 'share', 'QoderWork', 'resources', 'bin', 'qodercli'));
+  }
+  return paths.filter(existsSync);
+}
+
+// 廉价探测 qodercli 登录态：`qodercli status` 不发起 LLM 调用、不计费。
+// 返回 true=已登录 / false=未登录 / null=无法判定。
+function checkQoderCliLogin(command) {
+  try {
+    const out = execFileSync(command, ['status'], {
+      encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], env: cleanQoderEnv(),
+    });
+    if (/Not logged in/i.test(out)) return false;
+    if (/Username:/i.test(out)) return true;
+    return null;
+  } catch { return null; }
+}
+
 // 探测 Code CLI：生成器 spawn 的 LLM。优先级：
 //   1. config.codeCli.command（已注册）且可用 → 直接用
 //   2. PATH 上的 claude / codebuddy / qodercli
 //   3. WorkBuddy 内置 CLI（同目录 codebuddy shim，复用 WorkBuddy 登录态，用户零安装零费用）
+//   4. QoderWork 内置 qodercli（app 包绝对路径，不在 PATH；需一次性 qodercli login）
 // 探测到可用项时幂等回写 config.codeCli（含覆盖已失效的旧配置）
 function detectCodeCli() {
   const candidates = [
@@ -429,11 +469,13 @@ function detectCodeCli() {
     { type: 'codebuddy-code', command: 'codebuddy' },
     { type: 'qoder-code', command: 'qodercli' },
     { type: 'codebuddy-code', command: join(__dirname, 'codebuddy') },  // WorkBuddy 内置 shim
+    // QoderWork 内置 qodercli（不在 PATH，按 app 包绝对路径探测）
+    ...qoderworkBuiltinCliPaths().map((command) => ({ type: 'qoder-code', command })),
   ];
   const registered = readConfigValue('codeCli');
 
   const probe = (command) => {
-    try { return execFileSync(command, ['--version'], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); }
+    try { return execFileSync(command, ['--version'], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], env: cleanQoderEnv() }).trim(); }
     catch { return null; }
   };
 
@@ -536,6 +578,18 @@ async function cmdDoctor(opts) {
       }
     } catch (e) {
       advice.push(`无法创建 ~/.codebuddy/skills/webclaw3 软链（${e.message}），explore 子会话可能加载不到 webclaw3 skill`);
+    }
+  }
+
+  // 5b. qoder-code 登录引导：qodercli 无法复用 QoderWork 宿主登录态（宿主只把
+  //     一次性凭证喂给自己的直系子进程），需用户手动 login 一次。skills 目录
+  //     ~/.qoderwork/skills 与 CLI 读取目录一致，不需软链。
+  if (codeCli.type === 'qoder-code' && codeCli.found) {
+    const loggedIn = checkQoderCliLogin(codeCli.command);
+    if (loggedIn === false) {
+      advice.push(`qodercli 未登录：生成功能需要它登录后才能调用。请在终端运行一次「${codeCli.command} login」（浏览器授权），登录后无需再管。注：QoderWork App 的登录态无法直接复用，需 CLI 单独登录。`);
+    } else if (loggedIn === null) {
+      advice.push(`无法确认 qodercli 登录态：若生成时报未登录，请在终端运行「${codeCli.command} login」登录一次。`);
     }
   }
 
