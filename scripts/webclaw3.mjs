@@ -510,8 +510,9 @@ function checkQoderCliLogin(command) {
 //   claude-code → claude ；workbuddy-cn → codebuddy ；qoderwork-cn → qoderclicn
 // 只接受与期望 type 匹配的 CLI；探测到的与环境对不上（如 qoderwork-cn 却只有 codebuddy）→ 拒绝、
 // 不注册，found:false 并引导装对的那个。国内/国际账户不互通，绝不混用。
-// 优先级（均限定在期望 type 内）：registered(匹配且可用) > PATH 期望 binary > 环境专属兜底
-//   （仅 codebuddy-code 兜底 WorkBuddy 内置 shim；qoder-code 不做兜底，只认国内 qoderclicn）
+// 优先级（均限定在期望 type 内）：registered(匹配且可用) > PATH 期望 binary
+//   两个 env 都不做任何内置兜底：新方案要求各 env 独立安装 CLI 并自己登录（登录态不复用宿主 App），
+//   所以 codebuddy-code 只认独立安装的 codebuddy，qoder-code 只认国内 qoderclicn。
 function detectCodeCli(env) {
   const expected = ENV_CLI[env];
   if (!expected) {
@@ -521,12 +522,10 @@ function detectCodeCli(env) {
 
   // 只在期望 type 内构造候选
   const candidates = [{ type: expected.type, command: expected.binary }];
-  if (expected.type === 'codebuddy-code') {
-    candidates.push({ type: 'codebuddy-code', command: join(__dirname, 'codebuddy') }); // WorkBuddy 内置 shim
-  }
-  // 注意：qoder-code（qoderwork-cn）不做任何兜底——绝不回退到 QoderWork 内置的国际版 qodercli。
-  // 国内 qoderclicn 与国际 qodercli 是两套独立账户体系，不互通，混用会导致登录态对不上、生成失败。
-  // 没装 qoderclicn 时直接 found:false，引导用户装国内版。
+  // 不做任何内置兜底：codebuddy-code 只认独立安装的 codebuddy，qoder-code 只认国内 qoderclicn。
+  // 绝不回退到宿主 App 内置的 CLI（WorkBuddy 内置 codebuddy / QoderWork 内置国际版 qodercli）——
+  // 内置 CLI 复用宿主登录态，与新方案「各 env 独立安装、自己登录」冲突；国内/国际账户更是不互通。
+  // 没装期望 binary 时直接 found:false，引导用户装对的那个。
 
   const registered = readEnvValue(env, 'cli');
   const probe = (command) => {
