@@ -10,7 +10,7 @@
 
 import { spawn, execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, openSync, readdirSync, symlinkSync, readlinkSync, lstatSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
@@ -29,6 +29,22 @@ const CONFIG_FILE = join(PID_DIR, 'config.json');
 const LOG_FILE = '/tmp/relay.log';
 const CDP_LOG_FILE = '/tmp/cdp-proxy.log';
 
+// 宿主环境 → 期望的 Code CLI（生成器 spawn 的 LLM）。三种支持环境：
+//   claude-code   —— Claude Code CLI
+//   workbuddy-cn  —— WorkBuddy 国内桌面版
+//   qoderwork-cn  —— QoderWork 国内桌面版
+// 注意：国内/国际两套账户与 CLI 各自独立、不互通。国际版 QoderWork 的 CLI 叫 qodercli，
+// 与国内 qoderclicn 不是同一个东西；这里只覆盖我们支持的国内版。
+const ENV_CLI = {
+  'claude-code':  { type: 'claude-code',   binary: 'claude',     label: 'Claude Code',    doc: 'npm i -g @anthropic-ai/claude-code' },
+  'workbuddy-cn': { type: 'codebuddy-code', binary: 'codebuddy',  label: 'WorkBuddy 国内', doc: 'https://www.codebuddy.cn/docs/cli/quickstart' },
+  'qoderwork-cn': { type: 'qoder-code',     binary: 'qoderclicn', label: 'QoderWork 国内', doc: 'https://docs.qoder.cn/cli/qoder-cli-cn-get-started-quickly' },
+};
+
+// dist/ 里的随包文件（扩展 zip、生成器 tarball）在导入部分 skill 平台时会被剥离，
+// 缺失时从 GitHub raw 兜底下载。
+const DIST_RAW_BASE = 'https://raw.githubusercontent.com/fatmind/webclaw3/main/dist';
+
 function log(msg) {
   process.stderr.write(`[webclaw3] ${msg}\n`);
 }
@@ -37,7 +53,7 @@ function printUsage() {
   process.stdout.write(`webclaw3 — L0 层（Relay + CDP Proxy）启停与健康检查
 
 Usage:
-  webclaw3 doctor [--port 3459]
+  webclaw3 doctor --env <claude-code|workbuddy-cn|qoderwork-cn> [--port 3459]
   webclaw3 start [--port 3459] [--wait 10]
   webclaw3 stop [--port 3459]
   webclaw3 status [--port 3459] [--timeout 5]
@@ -54,10 +70,11 @@ Usage:
   webclaw3 -h | --help
 
 Relay Commands:
-  doctor   一条命令分层诊断：Node 版本 → relay（未启动则自动 start）→ 扩展连接
-           未连接时区分：Chrome 没开 / 扩展未安装 / 已装未连，输出 advice；不碰 CDP
-           另查生成四件套：Code CLI（未装给引导）+ 生成器自身（装了未跑则自动 start）+ AK/剩余次数
-           同时把本 skill 安装路径注册到 ~/.webclaw3/config.json（skillDir，幂等）
+  doctor   分两层诊断。先查【最必需】(能探索即可)：Node 版本 → relay(未启动则自动 start) → 扩展连接
+           (未连接时区分 Chrome 没开 / 扩展未安装 / 已装未连，输出 advice；不碰 CDP)
+           再查【提炼专用】(环节③才要)：按 --env 锁定对应 Code CLI(错配则拒绝并引导装对的)
+           + 生成器自身(装了未跑则自动 start) + AK/剩余次数。dist/ 缺文件时自动下载兜底
+           同时把本 skill 安装路径与 env 注册到 ~/.webclaw3/config.json(幂等)
   start    后台启动 relay（spawn start-relay.mjs），等端口 ready
   status   查询 3459 端口监听 + /api/status.extensionConnected
   stop     用 PID 文件杀进程
@@ -96,6 +113,7 @@ function parseOpts(args) {
     if (args[i] === '--port' && args[i + 1]) opts.port = parseInt(args[++i], 10);
     else if (args[i] === '--wait' && args[i + 1]) opts.wait = parseInt(args[++i], 10);
     else if (args[i] === '--timeout' && args[i + 1]) opts.timeout = parseInt(args[++i], 10);
+    else if (args[i] === '--env' && args[i + 1]) opts.env = args[++i];
     else if (args[i] === '-h' || args[i] === '--help') { printUsage(); process.exit(0); }
   }
   return opts;
@@ -219,19 +237,35 @@ function findPipelineBinary() {
   } catch { return null; }
 }
 
+// 确保 dist/ 里存在匹配文件；本地有就返回其路径，没有则从 GitHub raw 下载兜底。
+// pattern: 匹配已存在文件的正则；filename: 兜底下载时的确切文件名。失败返回 null。
+function ensureDistFile(skillDir, pattern, filename) {
+  try {
+    const distDir = join(skillDir, 'dist');
+    mkdirSync(distDir, { recursive: true });
+    let hit = null;
+    try { hit = readdirSync(distDir).filter(f => pattern.test(f)).sort().pop() || null; } catch { /* dir 读失败 */ }
+    if (hit) return join(distDir, hit);
+    // 本地缺失 → 下载兜底
+    const dest = join(distDir, filename);
+    const url = `${DIST_RAW_BASE}/${filename}`;
+    log(`dist/${filename} 缺失，正在从 GitHub 下载兜底…`);
+    execFileSync('curl', ['-fsSL', '--max-time', '60', '-o', dest, url], { stdio: ['ignore', 'ignore', 'inherit'] });
+    if (existsSync(dest)) { log(`已下载 dist/${filename}`); return dest; }
+    return null;
+  } catch (e) {
+    log(`dist/${filename} 下载失败：${e.message}`);
+    return null;
+  }
+}
+
 // 从 skill 目录的 dist/ 里就地安装生成器 tarball（随包分发、无依赖、离线可装）。
 // 成功返回 wc3-pipeline 二进制路径，失败返回 null。doctor 用它做"未装则自动装"，
 // 免去让用户手敲 npm i -g。
 function installPipelineFromDist(skillDir) {
   try {
-    const distDir = join(skillDir, 'dist');
-    if (!existsSync(distDir)) return null;
-    const tgz = readdirSync(distDir)
-      .filter(f => /^wc3-pipeline-.*\.tgz$/.test(f))
-      .sort()
-      .pop();
-    if (!tgz) return null;
-    const tgzPath = join(distDir, tgz);
+    const tgzPath = ensureDistFile(skillDir, /^wc3-pipeline-.*\.tgz$/, 'wc3-pipeline-0.1.0.tgz');
+    if (!tgzPath) return null;
     log('检测到生成器尚未安装，正在自动安装，请稍候…');
     // 底层执行 npm i -g <skillDir>/dist/wc3-pipeline-*.tgz（离线安装，无外部依赖）
     execFileSync('npm', ['i', '-g', tgzPath], { stdio: ['ignore', 'ignore', 'inherit'] });
@@ -268,7 +302,8 @@ function checkPipelinePort(timeoutMs = 1000) {
 async function cmdPipelineStart(opts) {
   let binary = findPipelineBinary();
   if (!binary) {
-    const skillDir = readConfigValue('skillDir');
+    const activeEnv = readConfigValue('activeEnv');
+    const skillDir = activeEnv ? readEnvValue(activeEnv, 'skillDir') : null;
     if (skillDir) binary = installPipelineFromDist(skillDir);
   }
   if (!binary) {
@@ -411,11 +446,44 @@ function detectExtensionInstalled() {
   return sawSettings ? false : null;
 }
 
+function readConfig() {
+  try { return JSON.parse(readFileSync(CONFIG_FILE, 'utf-8')); } catch { return {}; }
+}
+
+// 读顶层扁平键（activeEnv / ak / appBase）
 function readConfigValue(key) {
-  try {
-    const cfg = JSON.parse(readFileSync(CONFIG_FILE, 'utf-8'));
-    return cfg?.[key] ?? null;
-  } catch { return null; }
+  return readConfig()?.[key] ?? null;
+}
+
+// 读某环境下的字段：envs[env][key]（如 cli / skillDir）
+function readEnvValue(env, key) {
+  return readConfig()?.envs?.[env]?.[key] ?? null;
+}
+
+// 深合并写入 envs[env]（保留该环境已有字段与其它环境）
+function writeEnvValue(env, patch) {
+  const cfg = readConfig();
+  cfg.envs = cfg.envs || {};
+  cfg.envs[env] = { ...(cfg.envs[env] || {}), ...patch };
+  mkdirSync(PID_DIR, { recursive: true });
+  writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
+  return cfg;
+}
+
+// 解析宿主环境：--env（合法则幂等写入 config.activeEnv 并确保 envs[env] 存在）> config.activeEnv > null。
+// 返回：合法 env key 字符串 / { invalid: <传入值> } / null（完全无信息）。
+function resolveEnv(opts) {
+  if (opts.env) {
+    if (ENV_CLI[opts.env]) {
+      writeConfig({ activeEnv: opts.env });
+      writeEnvValue(opts.env, {}); // 确保 envs[env] 存在（初始化成功过的环境都进 envs）
+      return opts.env;
+    }
+    return { invalid: opts.env };
+  }
+  const saved = readConfigValue('activeEnv');
+  if (saved && ENV_CLI[saved]) return saved;
+  return null;
 }
 
 // 剥离宿主注入的 QODER* 环境变量。若 webclaw3 由 QoderWork 启动，宿主会注入
@@ -423,25 +491,6 @@ function readConfigValue(key) {
 // 探测/登录检查一律用干净 env，等同「终端手敲」。对 claude/codebuddy 无副作用。
 function cleanQoderEnv() {
   return Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^QODER/.test(k)));
-}
-
-// QoderWork 内置的 qodercli 不在 PATH、也不建 symlink，只能按 app 包绝对路径找。
-// 返回实际存在的候选路径（按平台已知位置探测）。
-function qoderworkBuiltinCliPaths() {
-  const paths = [];
-  if (process.platform === 'darwin') {
-    paths.push('/Applications/QoderWork.app/Contents/Resources/bin/qodercli');
-    paths.push(join(homedir(), 'Applications', 'QoderWork.app', 'Contents', 'Resources', 'bin', 'qodercli'));
-  } else if (process.platform === 'win32') {
-    const la = process.env.LOCALAPPDATA;
-    if (la) paths.push(join(la, 'Programs', 'QoderWork', 'resources', 'bin', 'qodercli.exe'));
-    paths.push(join('C:', 'Program Files', 'QoderWork', 'resources', 'bin', 'qodercli.exe'));
-  } else {
-    // linux（若发行）：常见 electron 布局
-    paths.push('/opt/QoderWork/resources/bin/qodercli');
-    paths.push(join(homedir(), '.local', 'share', 'QoderWork', 'resources', 'bin', 'qodercli'));
-  }
-  return paths.filter(existsSync);
 }
 
 // 廉价探测 qodercli 登录态：`qodercli status` 不发起 LLM 调用、不计费。
@@ -457,53 +506,87 @@ function checkQoderCliLogin(command) {
   } catch { return null; }
 }
 
-// 探测 Code CLI：生成器 spawn 的 LLM。优先级：
-//   1. config.codeCli.command（已注册）且可用 → 直接用
-//   2. PATH 上的 claude / codebuddy / qodercli
-//   3. WorkBuddy 内置 CLI（同目录 codebuddy shim，复用 WorkBuddy 登录态，用户零安装零费用）
-//   4. QoderWork 内置 qodercli（app 包绝对路径，不在 PATH；需一次性 qodercli login）
-// 探测到可用项时幂等回写 config.codeCli（含覆盖已失效的旧配置）
-function detectCodeCli() {
-  const candidates = [
-    { type: 'claude-code', command: 'claude' },
-    { type: 'codebuddy-code', command: 'codebuddy' },
-    { type: 'qoder-code', command: 'qodercli' },
-    { type: 'codebuddy-code', command: join(__dirname, 'codebuddy') },  // WorkBuddy 内置 shim
-    // QoderWork 内置 qodercli（不在 PATH，按 app 包绝对路径探测）
-    ...qoderworkBuiltinCliPaths().map((command) => ({ type: 'qoder-code', command })),
-  ];
-  const registered = readConfigValue('codeCli');
+// 探测 Code CLI：生成器 spawn 的 LLM。**按宿主环境锁定期望 type**（env 来自 --env / config.env）：
+//   claude-code → claude ；workbuddy-cn → codebuddy ；qoderwork-cn → qoderclicn
+// 只接受与期望 type 匹配的 CLI；探测到的与环境对不上（如 qoderwork-cn 却只有 codebuddy）→ 拒绝、
+// 不注册，found:false 并引导装对的那个。国内/国际账户不互通，绝不混用。
+// 优先级（均限定在期望 type 内）：registered(匹配且可用) > PATH 期望 binary > 环境专属兜底
+//   （仅 codebuddy-code 兜底 WorkBuddy 内置 shim；qoder-code 不做兜底，只认国内 qoderclicn）
+function detectCodeCli(env) {
+  const expected = ENV_CLI[env];
+  if (!expected) {
+    // 理论上 doctor 会在 env 缺失时提前短路；这里兜底返回未就绪。
+    return { type: null, command: null, found: false, version: null };
+  }
 
+  // 只在期望 type 内构造候选
+  const candidates = [{ type: expected.type, command: expected.binary }];
+  if (expected.type === 'codebuddy-code') {
+    candidates.push({ type: 'codebuddy-code', command: join(__dirname, 'codebuddy') }); // WorkBuddy 内置 shim
+  }
+  // 注意：qoder-code（qoderwork-cn）不做任何兜底——绝不回退到 QoderWork 内置的国际版 qodercli。
+  // 国内 qoderclicn 与国际 qodercli 是两套独立账户体系，不互通，混用会导致登录态对不上、生成失败。
+  // 没装 qoderclicn 时直接 found:false，引导用户装国内版。
+
+  const registered = readEnvValue(env, 'cli');
   const probe = (command) => {
     try { return execFileSync(command, ['--version'], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], env: cleanQoderEnv() }).trim(); }
     catch { return null; }
   };
 
-  if (registered?.command) {
+  // envs[env].cli 复用有两道闸：type 与当前环境一致，且 binary 名也得对得上（防脏数据）。
+  // 新 schema 下 cli 存在各自 env 键下，跨环境串味结构上已不可能；这里只兜同环境内的损坏/错记。
+  const regBaseOk = registered?.command && basename(registered.command).replace(/\.exe$/i, '') === expected.binary;
+  if (registered?.command && registered.type === expected.type && regBaseOk) {
     const version = probe(registered.command);
-    if (version) return { type: registered.type || null, command: registered.command, found: true, version };
-    log(`registered codeCli 不可用（${registered.command}），重新探测...`);
+    if (version) return { type: registered.type, command: registered.command, found: true, version };
+    log(`envs.${env}.cli 不可用（${registered.command}），重新探测...`);
+  } else if (registered?.command && (registered.type !== expected.type || !regBaseOk)) {
+    log(`envs.${env}.cli（${registered.type} / ${registered.command}）与期望不符，重新探测...`);
   }
 
   for (const c of candidates) {
     const version = probe(c.command);
     if (!version) continue;
     if (!registered || registered.command !== c.command || registered.type !== c.type) {
-      writeConfig({ codeCli: { type: c.type, command: c.command } });
-      log(`codeCli registered: ${c.type} → ${c.command}`);
+      writeEnvValue(env, { cli: { type: c.type, command: c.command } });
+      log(`envs.${env}.cli registered: ${c.type} → ${c.command}`);
     }
     return { type: c.type, command: c.command, found: true, version };
   }
-  const fallback = registered?.command || 'claude';
-  return { type: registered?.type || null, command: fallback, found: false, version: null };
+  // 环境期望的 CLI 一个都没找到 → 未就绪。每个环境有各自独立的 cli 槽（envs[env].cli），
+  // 这里把它设成当前环境期望的 binary（哪怕没装），让 pipeline 绑到「对的但没装」的 CLI 上干净失败，
+  // 而不会误用别的环境的 CLI/账户。
+  if (!registered || registered.command !== expected.binary || registered.type !== expected.type) {
+    writeEnvValue(env, { cli: { type: expected.type, command: expected.binary } });
+    log(`envs.${env}.cli 同步为期望值（未安装）：${expected.type} → ${expected.binary}`);
+  }
+  return { type: expected.type, command: expected.binary, found: false, version: null };
 }
 
 async function cmdDoctor(opts) {
   const advice = [];
 
-  // 0. 注册 skill 安装路径到 ~/.webclaw3/config.json（幂等）：
-  //    用户电脑常有多个 AI 产品、多份 skill 安装，webclaw3 各组件以 config.skillDir 为唯一定位，最近一次 doctor 生效
-  const skillDir = registerSkillDir();
+  // 0a. 先弄清楚你在哪个环境跑（doctor 必须知道，才能对上正确的 CLI）。
+  //     顺序：--env（会记到 config）> 上次记的 config.env > 都没有就问你一句。
+  const envResult = resolveEnv(opts);
+  if (envResult === null || (envResult && envResult.invalid)) {
+    const bad = envResult && envResult.invalid;
+    const msg = bad
+      ? `没认出环境「${bad}」。请在这三个里挑一个重跑：claude-code（你在用 Claude Code）、workbuddy-cn（你在用 WorkBuddy 国内版）、qoderwork-cn（你在用 QoderWork 国内版）。像这样：doctor --env qoderwork-cn`
+      : `先告诉我你在哪个环境跑，我才能装对应的 CLI。三选一，用 --env 带上：claude-code（Claude Code）、workbuddy-cn（WorkBuddy 国内版）、qoderwork-cn（QoderWork 国内版）。像这样：doctor --env qoderwork-cn`;
+    advice.push(msg);
+    log(`advice: ${msg}`);
+    process.stdout.write(JSON.stringify({ ok: false, needEnv: true, env: null, advice }) + '\n');
+    return 1;
+  }
+  const env = envResult;
+  log(`host env: ${env}（${ENV_CLI[env].label}）`);
+
+  // 0b. 把「当前这份 skill 拷贝」的安装路径登记到共享 ~/.webclaw3/config.json 的 envs[env].skillDir（幂等）：
+  //    各宿主装的是各自隔离的物理拷贝，各自记在自己 env 名下；activeEnv 指向谁，pipeline 就用谁的 skillDir。
+  //    与「切宿主后要重跑 doctor --env」的规矩自洽：那次重跑会把 activeEnv 切过来、并刷新该 env 的 skillDir。
+  const skillDir = registerSkillDir(env);
 
   // 1. Node 版本（relay 依赖原生 WebSocket）
   const nodeMajor = parseInt(process.versions.node.split('.')[0], 10);
@@ -541,12 +624,17 @@ async function cmdDoctor(opts) {
       advice.push('Chrome 未运行：请打开 Chrome，扩展会在 20 秒内自动连上，然后重跑 doctor');
     } else {
       extInstalled = detectExtensionInstalled();
+      // 扩展 zip 优先用本地 dist/ 里的（缺了自动下载兜底）；下不到再给 GitHub 链接
+      const zipPath = ensureDistFile(skillDir, /^wc3-chrome-extension-.*\.zip$/, 'wc3-chrome-extension-0.6.0.zip');
+      const zipHint = zipPath
+        ? `解压本地文件 ${zipPath}`
+        : '下载 https://github.com/fatmind/webclaw3/blob/main/dist/wc3-chrome-extension-0.6.0.zip 并解压';
       if (extInstalled === false) {
-        advice.push('未检测到 wc3 扩展：下载 https://github.com/fatmind/webclaw3/blob/main/dist/wc3-chrome-extension-0.6.0.zip → 解压 zip → 打开 chrome://extensions/ → 右上角开「开发者模式」→「加载已解压的扩展程序」→ 选刚解压后的文件夹');
+        advice.push(`未检测到 wc3 扩展：${zipHint} → 打开 chrome://extensions/ → 右上角开「开发者模式」→「加载已解压的扩展程序」→ 选刚解压后的文件夹`);
       } else if (extInstalled === true) {
         advice.push('扩展已安装但未连接：到 chrome://extensions 确认 wc3 未被禁用，点「重新加载」后等 20 秒重跑 doctor');
       } else {
-        advice.push('无法确认扩展是否安装：请打开 chrome://extensions 检查——没装则下载 https://github.com/fatmind/webclaw3/blob/main/dist/wc3-chrome-extension-0.6.0.zip，解压后开启「开发者模式」→「加载已解压的扩展程序」→ 选刚解压后的文件夹；已装则确认 wc3 未被禁用并点「重新加载」，等 20 秒重跑 doctor');
+        advice.push(`无法确认扩展是否安装：请打开 chrome://extensions 检查——没装则${zipHint}，然后开启「开发者模式」→「加载已解压的扩展程序」→ 选刚解压后的文件夹；已装则确认 wc3 未被禁用并点「重新加载」，等 20 秒重跑 doctor`);
       }
     }
   }
@@ -555,10 +643,11 @@ async function cmdDoctor(opts) {
   // "Chrome 登录态可用"：登录态是用户自己的、按站点，无法通用检查——
   // 以扩展连通为浏览器通道就绪的近似（生成时 explore 走真实站点登录态，按站点引导）
 
-  // 5. Code CLI：生成器 spawn 的 LLM（烧用户 token）
-  const codeCli = detectCodeCli();
+  // 5. Code CLI：生成器 spawn 的 LLM（烧用户 token）。按当前环境锁定，错配会被拒绝。
+  const codeCli = detectCodeCli(env);
   if (!codeCli.found) {
-    advice.push(`未检测到可用的 AI 编码工具（${codeCli.command}）：生成功能依赖它来跑，请先安装 claude-code（命令：npm i -g @anthropic-ai/claude-code），或安装你所用的同类 AI 产品`);
+    const exp = ENV_CLI[env];
+    advice.push(`当前环境是 ${exp.label}，需要安装它对应的 Code CLI「${exp.binary}」（生成器靠它跑 LLM）。安装：${exp.doc}。装好后必须先登录一次（新装的 CLI 一定要自己登录，不能沿用 App 的登录态）；国内版和国际版不通用，别装错。详见 references/setup.md`);
   }
 
   // 5a. codebuddy-code 双落 skills：WorkBuddy 把 skill 装在 ~/.workbuddy/skills/，
@@ -585,11 +674,15 @@ async function cmdDoctor(opts) {
   //     一次性凭证喂给自己的直系子进程），需用户手动 login 一次。skills 目录
   //     ~/.qoderwork/skills 与 CLI 读取目录一致，不需软链。
   if (codeCli.type === 'qoder-code' && codeCli.found) {
+    const isCn = /qoderclicn/i.test(codeCli.command);
+    const loginHint = isCn
+      ? `在终端运行一次「${codeCli.command}」，进 TUI 后敲「/login」（浏览器授权，记得选国内站）`
+      : `在终端运行一次「${codeCli.command} login」（浏览器授权）`;
     const loggedIn = checkQoderCliLogin(codeCli.command);
     if (loggedIn === false) {
-      advice.push(`qodercli 未登录：生成功能需要它登录后才能调用。请在终端运行一次「${codeCli.command} login」（浏览器授权），登录后无需再管。注：QoderWork App 的登录态无法直接复用，需 CLI 单独登录。`);
+      advice.push(`${codeCli.command} 还没登录：生成功能得先登录才能用。请${loginHint}，登录一次后就不用再管。注意：新装的 CLI 必须自己登录，App 里登过不算，登录态不能直接搬过来。`);
     } else if (loggedIn === null) {
-      advice.push(`无法确认 qodercli 登录态：若生成时报未登录，请在终端运行「${codeCli.command} login」登录一次。`);
+      advice.push(`没法确认 ${codeCli.command} 登录没：要是生成时报未登录，就${loginHint} 登录一次。新装的 CLI 一定要自己登录，不能复用 App 的登录态。`);
     }
   }
 
@@ -621,11 +714,15 @@ async function cmdDoctor(opts) {
     else if (quota && quota.remaining_quota === 0) advice.push('剩余次数为 0：到 wc3-app 购买额度');
   }
 
+  // 两层就绪判定：
+  //   必需层（能探索）：Node + relay + 扩展连通
+  //   提炼层（能提炼，环节③）：对应环境的 Code CLI 就绪 + 生成器安装并运行
   const l0Ok = nodeOk && relay.listening && extConnected;
   const genOk = codeCli.found && pipelineInstalled && pipeline.listening;
   const ok = l0Ok && genOk;
   const result = {
     ok,
+    env,
     ready: { explore: l0Ok, generate: genOk },
     node: { version: process.version, ok: nodeOk },
     relay: { port: opts.port, listening: relay.listening, pid: readPidFile() },
@@ -681,17 +778,13 @@ function checkQuota(appBase, ak) {
   });
 }
 
-/** 把本 skill 安装目录（scripts/ 的上级）登记到 config.json 的 skillDir，幂等回写 */
-function registerSkillDir() {
+/** 把本 skill 安装目录（scripts/ 的上级）登记到 config.json 的 envs[env].skillDir，幂等回写 */
+function registerSkillDir(env) {
   const skillDir = dirname(__dirname);
   try {
-    let cfg = {};
-    try { cfg = JSON.parse(readFileSync(CONFIG_FILE, 'utf-8')); } catch { /* 首次无配置 */ }
-    if (cfg.skillDir !== skillDir) {
-      cfg.skillDir = skillDir;
-      mkdirSync(PID_DIR, { recursive: true });
-      writeFileSync(CONFIG_FILE, JSON.stringify(cfg));
-      log(`skillDir registered: ${skillDir}`);
+    if (readEnvValue(env, 'skillDir') !== skillDir) {
+      writeEnvValue(env, { skillDir });
+      log(`envs.${env}.skillDir registered: ${skillDir}`);
     }
   } catch (e) {
     log(`skillDir register failed: ${e.message}`);
