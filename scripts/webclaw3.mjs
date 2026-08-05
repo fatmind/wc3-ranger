@@ -160,11 +160,7 @@ async function startRelayCore(opts) {
   mkdirSync(PID_DIR, { recursive: true });
 
   const out = openSync(LOG_FILE, 'a');
-  const child = spawn('node', [RELAY_SCRIPT, String(opts.port)], {
-    detached: true,
-    stdio: ['ignore', out, out],
-  });
-  child.unref();
+  const child = spawnDaemonViaLoginShell('node', [RELAY_SCRIPT, String(opts.port)], out);
   writeFileSync(PID_FILE, String(child.pid));
   log(`spawned relay pid=${child.pid} port=${opts.port}, waiting up to ${opts.wait}s`);
 
@@ -235,6 +231,29 @@ function findPipelineBinary() {
   try {
     return execFileSync('which', ['wc3-pipeline'], { encoding: 'utf-8' }).trim();
   } catch { return null; }
+}
+
+// webclaw3 拉起的常驻后台进程（pipeline daemon / relay / cdp-proxy）的统一启动入口——从干净环境起。
+// 背景：这些进程常被宿主 Agent（如 WorkBuddy/QoderWork）里跑的 webclaw3.mjs 拉起，宿主注入的变量
+// （托管 node 优先的 PATH、CODEBUDDY_*/QODER_*/MCP 配置等）会一路继承进子进程。对 pipeline daemon
+// 危害最大：它再 spawn 的 code CLI（codebuddy/qoderclicn）会切进 SDK 模式、连错沙箱端口、登录态错位。
+// relay/cdp 虽不 spawn code CLI、危害小，但统一走干净环境可保证「凡 webclaw3 拉起的常驻进程都等价
+// 终端手敲」，node 也统一由登录 shell 的 PATH 解析，避免以后埋坑。
+// 收口方案：不在下游各 spawn 点逐个黑名单过滤（散且难查），而在此唯一咽喉点用
+// 「env -i 语义（只留 HOME）+ 登录 shell（-l）」重建环境——登录 shell 读 ~/.zprofile/~/.zshrc
+// 把 PATH、登录态重新搭起来。与探测用的 execViaLoginShell 同源同语义。
+// command 走 PATH 解析（如 'node'）或用绝对路径均可；command/args 用单引号转义防注入。
+function spawnDaemonViaLoginShell(command, args, out) {
+  const shell = process.env.SHELL || '/bin/zsh';
+  const shq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+  const line = `exec ${[command, ...args].map(shq).join(' ')}`;
+  const child = spawn(shell, ['-lc', line], {
+    detached: true,
+    stdio: ['ignore', out, out],
+    env: { HOME: process.env.HOME },
+  });
+  child.unref();
+  return child;
 }
 
 // 确保 dist/ 里存在匹配文件；本地有就返回其路径，没有则从 GitHub raw 下载兜底。
@@ -321,8 +340,7 @@ async function cmdPipelineStart(opts) {
 
   mkdirSync(PID_DIR, { recursive: true });
   const out = openSync(PIPELINE_LOG_FILE, 'a');
-  const child = spawn(binary, ['--serve'], { detached: true, stdio: ['ignore', out, out] });
-  child.unref();
+  const child = spawnDaemonViaLoginShell(binary, ['--serve'], out);
   writeFileSync(PIPELINE_PID_FILE, String(child.pid));
   log(`spawned pipeline pid=${child.pid} :${PIPELINE_PORT}, waiting up to ${opts.wait}s`);
 
@@ -486,19 +504,29 @@ function resolveEnv(opts) {
   return null;
 }
 
-// 剥离宿主注入的 QODER* 环境变量。若 webclaw3 由 QoderWork 启动，宿主会注入
-// QODER_AGENT_SDK_ENTRYPOINT 等，会让内置 qodercli 强切 SDK 模式或配置目录错位；
-// 探测/登录检查一律用干净 env，等同「终端手敲」。对 claude/codebuddy 无副作用。
-function cleanQoderEnv() {
-  return Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^QODER/.test(k)));
+// doctor 探测 CLI（登录态/版本）时，必须与 daemon 执行 CLI 用同一套环境，否则
+// 「探测时用宿主污染 PATH 命中 CLI-A、daemon 用干净 PATH 命中 CLI-B」会让 doctor 说 OK
+// 却实跑失败。故探测统一走登录 shell 重建环境——与 spawnDaemonViaLoginShell 同源、同「终端手敲」语义：
+// env 只留 HOME，PATH/登录态由 ~/.zprofile/~/.zshrc 重建，顺带天然剥离宿主注入的
+// QODER_*/CODEBUDDY_*/MCP 等。command 走 PATH 解析（探测到的即执行时会命中的那个）。
+// command/args 用单引号转义防 shell 注入。
+function execViaLoginShell(command, args, opts = {}) {
+  const shell = process.env.SHELL || '/bin/zsh';
+  const shq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+  const line = `exec ${[command, ...args].map(shq).join(' ')}`;
+  return execFileSync(shell, ['-lc', line], {
+    encoding: 'utf-8',
+    env: { HOME: process.env.HOME },
+    ...opts,
+  });
 }
 
 // 廉价探测 qodercli 登录态：`qodercli status` 不发起 LLM 调用、不计费。
 // 返回 true=已登录 / false=未登录 / null=无法判定。
 function checkQoderCliLogin(command) {
   try {
-    const out = execFileSync(command, ['status'], {
-      encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], env: cleanQoderEnv(),
+    const out = execViaLoginShell(command, ['status'], {
+      stdio: ['ignore', 'pipe', 'ignore'],
     });
     if (/Not logged in/i.test(out)) return false;
     if (/Username:/i.test(out)) return true;
@@ -529,7 +557,7 @@ function detectCodeCli(env) {
 
   const registered = readEnvValue(env, 'cli');
   const probe = (command) => {
-    try { return execFileSync(command, ['--version'], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], env: cleanQoderEnv() }).trim(); }
+    try { return execViaLoginShell(command, ['--version'], { stdio: ['ignore', 'pipe', 'ignore'] }).trim(); }
     catch { return null; }
   };
 
@@ -744,8 +772,7 @@ async function startPipelineCore(opts) {
   if (!binary) return { listening: false };
   mkdirSync(PID_DIR, { recursive: true });
   const out = openSync(PIPELINE_LOG_FILE, 'a');
-  const child = spawn(binary, ['--serve'], { detached: true, stdio: ['ignore', out, out] });
-  child.unref();
+  const child = spawnDaemonViaLoginShell(binary, ['--serve'], out);
   writeFileSync(PIPELINE_PID_FILE, String(child.pid));
   const deadline = Date.now() + opts.wait * 1000;
   let last = { listening: false };
@@ -838,11 +865,7 @@ async function cmdCdpStart(opts) {
   mkdirSync(PID_DIR, { recursive: true });
 
   const out = openSync(CDP_LOG_FILE, 'a');
-  const child = spawn('node', [CDP_SCRIPT, String(port)], {
-    detached: true,
-    stdio: ['ignore', out, out],
-  });
-  child.unref();
+  const child = spawnDaemonViaLoginShell('node', [CDP_SCRIPT, String(port)], out);
   writeFileSync(CDP_PID_FILE, String(child.pid));
   log(`spawned CDP proxy pid=${child.pid} port=${port}, waiting up to ${opts.wait}s`);
 
