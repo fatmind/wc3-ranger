@@ -19,6 +19,8 @@ webclaw3 可能跑在不同宿主里，**每个宿主对应一个专属的 Code 
 | `workbuddy-cn` | **WorkBuddy 国内**（PC 桌面） | `codebuddy` | `npm install -g @tencent-ai/codebuddy-code` | https://www.codebuddy.cn/docs/cli/quickstart |
 | `qoderwork-cn` | **QoderWork 国内**（PC 桌面） | `qoderclicn` | `curl -fsSL https://qoder.cn/install \| bash` | https://docs.qoder.cn/cli/qoder-cli-cn-get-started-quickly |
 
+> **装 CLI 直接用「安装命令」那一列，别再去翻 quickstart 文档。** 那列命令就是权威做法，复制到终端跑就行；最后一列的 quickstart 链接只是万一命令失败时的兜底参考，正常流程不用点。
+
 > ⚠️ **务必分清「国内版 / 国际版」——最容易踩的坑。**
 > QoderWork 与 CodeBuddy 都有国内、国际两套，账户与 CLI **各自独立、不互通**。我们目前支持的都是**国内版**：WorkBuddy → `codebuddy`，QoderWork → `qoderclicn`。注意国际版的 QoderWork CLI 叫 `qodercli`，跟国内的 `qoderclicn` 不是一个东西，别装错、别混用。
 
@@ -77,13 +79,14 @@ doctor 按「**先最必需、再提炼专用**」两层检查，能自动修的
 
 ## 扩展安装（用户一次性操作）
 
-wc3-chrome 还没通过 Chrome 商店审核，走本地开发者模式装打包好的 zip。它随本 skill 仓库分发在 `dist/` 下；**若导入别的 skill 平台时 dist 里的 zip 被剥离，doctor 会自动从 GitHub 下载补齐**，advice 里会直接给出本地解压路径（下不到才回退给 https://github.com/fatmind/webclaw3/blob/main/dist/wc3-chrome-extension-0.6.0.zip）。引导用户：
+wc3-chrome 还没通过 Chrome 商店审核，走本地开发者模式装打包好的 zip。它随本 skill 仓库分发在 `dist/` 下；**若导入别的 skill 平台时 dist 里的 zip 被剥离，doctor 会自动从 GitHub 下载补齐**。doctor 会**自动把扩展解压到用户 Downloads 下一个好找的文件夹**（`~/Downloads/wc3-chrome-extension`），advice 里直接给出这个文件夹路径，用户不用自己解压。引导用户：
 
-1. **解压 zip**（用 advice 里给的本地文件路径，或上面的下载链接）
-2. 打开 `chrome://extensions/`
-3. 右上角开启「**开发者模式**」
-4. 点「**加载已解压的扩展程序**」
-5. 选刚解压后的文件夹
+1. 打开 `chrome://extensions/`
+2. 右上角开启「**开发者模式**」
+3. 点「**加载已解压的扩展程序**」
+4. 选 advice 里给的那个 Downloads 文件夹（`~/Downloads/wc3-chrome-extension`）
+
+（万一 doctor 连本地 zip 都没有、也没自动解压，才回退到手动下载 https://github.com/fatmind/webclaw3/blob/main/dist/wc3-chrome-extension-0.6.0.zip 解压后再选文件夹。）
 
 装完后重跑 doctor，第一层就绪即可探索。
 

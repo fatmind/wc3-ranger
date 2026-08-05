@@ -37,8 +37,8 @@ const CDP_LOG_FILE = '/tmp/cdp-proxy.log';
 // 与国内 qoderclicn 不是同一个东西；这里只覆盖我们支持的国内版。
 const ENV_CLI = {
   'claude-code':  { type: 'claude-code',   binary: 'claude',     label: 'Claude Code',    doc: 'npm i -g @anthropic-ai/claude-code' },
-  'workbuddy-cn': { type: 'codebuddy-code', binary: 'codebuddy',  label: 'WorkBuddy 国内', doc: 'https://www.codebuddy.cn/docs/cli/quickstart' },
-  'qoderwork-cn': { type: 'qoder-code',     binary: 'qoderclicn', label: 'QoderWork 国内', doc: 'https://docs.qoder.cn/cli/qoder-cli-cn-get-started-quickly' },
+  'workbuddy-cn': { type: 'codebuddy-code', binary: 'codebuddy',  label: 'WorkBuddy 国内', doc: 'npm install -g @tencent-ai/codebuddy-code' },
+  'qoderwork-cn': { type: 'qoder-code',     binary: 'qoderclicn', label: 'QoderWork 国内', doc: 'curl -fsSL https://qoder.cn/install | bash' },
 };
 
 // dist/ 里的随包文件（扩展 zip、生成器 tarball）在导入部分 skill 平台时会被剥离，
@@ -274,6 +274,21 @@ function ensureDistFile(skillDir, pattern, filename) {
     return null;
   } catch (e) {
     log(`dist/${filename} 下载失败：${e.message}`);
+    return null;
+  }
+}
+
+// 把扩展 zip 解压到用户 Downloads 下一个好找的文件夹（~/Downloads/wc3-chrome-extension），
+// 免得小白用户去隐藏目录里找。返回解压后的文件夹绝对路径；失败返回 null。
+function extractExtensionToDownloads(zipPath) {
+  try {
+    const destDir = join(homedir(), 'Downloads', 'wc3-chrome-extension');
+    mkdirSync(destDir, { recursive: true });
+    // -o 覆盖已存在文件，-q 安静模式；zip 内 manifest.json 在根目录，直接解到 destDir
+    execFileSync('unzip', ['-o', '-q', zipPath, '-d', destDir], { stdio: ['ignore', 'ignore', 'inherit'] });
+    return destDir;
+  } catch (e) {
+    log(`扩展解压到 Downloads 失败：${e.message}`);
     return null;
   }
 }
@@ -651,17 +666,19 @@ async function cmdDoctor(opts) {
       advice.push('Chrome 未运行：请打开 Chrome，扩展会在 20 秒内自动连上，然后重跑 doctor');
     } else {
       extInstalled = detectExtensionInstalled();
-      // 扩展 zip 优先用本地 dist/ 里的（缺了自动下载兜底）；下不到再给 GitHub 链接
+      // 扩展 zip 优先用本地 dist/ 里的（缺了自动下载兜底）；拿到后自动解压到 Downloads，好让用户找得到
       const zipPath = ensureDistFile(skillDir, /^wc3-chrome-extension-.*\.zip$/, 'wc3-chrome-extension-0.6.0.zip');
-      const zipHint = zipPath
-        ? `解压本地文件 ${zipPath}`
-        : '下载 https://github.com/fatmind/webclaw3/blob/main/dist/wc3-chrome-extension-0.6.0.zip 并解压';
+      const extractedDir = zipPath ? extractExtensionToDownloads(zipPath) : null;
+      const folderHint = extractedDir
+        ? `扩展文件夹已给你放到「${extractedDir}」`
+        : '先下载 https://github.com/fatmind/webclaw3/blob/main/dist/wc3-chrome-extension-0.6.0.zip 并解压到一个好找的文件夹';
+      const installSteps = '打开 chrome://extensions/ → 右上角打开「开发者模式」→ 点「加载已解压的扩展程序」→ 选中那个文件夹';
       if (extInstalled === false) {
-        advice.push(`未检测到 wc3 扩展：${zipHint} → 打开 chrome://extensions/ → 右上角开「开发者模式」→「加载已解压的扩展程序」→ 选刚解压后的文件夹`);
+        advice.push(`还没装浏览器扩展。${folderHint}，然后：${installSteps}。装完等 20 秒重跑 doctor。`);
       } else if (extInstalled === true) {
-        advice.push('扩展已安装但未连接：到 chrome://extensions 确认 wc3 未被禁用，点「重新加载」后等 20 秒重跑 doctor');
+        advice.push('扩展装了但没连上：打开 chrome://extensions，确认 wc3 没被关掉，点一下「重新加载」，等 20 秒再重跑 doctor。');
       } else {
-        advice.push(`无法确认扩展是否安装：请打开 chrome://extensions 检查——没装则${zipHint}，然后开启「开发者模式」→「加载已解压的扩展程序」→ 选刚解压后的文件夹；已装则确认 wc3 未被禁用并点「重新加载」，等 20 秒重跑 doctor`);
+        advice.push(`没法确认扩展装没装，请打开 chrome://extensions 看一眼：没装的话，${folderHint}，然后 ${installSteps}；装了的话，确认 wc3 没被关掉、点「重新加载」，等 20 秒重跑 doctor。`);
       }
     }
   }
@@ -674,7 +691,7 @@ async function cmdDoctor(opts) {
   const codeCli = detectCodeCli(env);
   if (!codeCli.found) {
     const exp = ENV_CLI[env];
-    advice.push(`当前环境是 ${exp.label}，需要安装它对应的 Code CLI「${exp.binary}」（生成器靠它跑 LLM）。安装：${exp.doc}。装好后必须先登录一次（新装的 CLI 一定要自己登录，不能沿用 App 的登录态）；国内版和国际版不通用，别装错。详见 references/setup.md`);
+    advice.push(`还差一个工具「${exp.binary}」没装（生成功能要用它）。请在终端直接运行这行命令装好：${exp.doc}。装完后按提示登录一次就行（一定要用它自己登录，App 里登过的不算）。注意认准${exp.label}，国内版和国际版不通用，别装错。`);
   }
 
   // 5a. codebuddy-code 双落 skills：WorkBuddy 把 skill 装在 ~/.workbuddy/skills/，
